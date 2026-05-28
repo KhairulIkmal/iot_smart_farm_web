@@ -296,21 +296,40 @@ async function loadOverviewRecentTickets() {
             return;
         }
 
+        const tickets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        // Resolve all device_ids → AGR-XXXX-XXXX unique codes
+        const needsLookup = [...new Set(tickets.map(t => t.device_id).filter(Boolean))];
+        const uniqueCodeMap = {};
+        for (let i = 0; i < needsLookup.length; i += 10) {
+            const batch = needsLookup.slice(i, i + 10);
+            try {
+                const devSnap = await db.collection('devices')
+                    .where(firebase.firestore.FieldPath.documentId(), 'in', batch)
+                    .get();
+                devSnap.forEach(d => { uniqueCodeMap[d.id] = d.data().unique_code || d.id; });
+            } catch (_) {}
+        }
+
         const statusColors = { open: 'text-primary', in_progress: 'text-orange-400', resolved: 'text-[#9db9a6]' };
         const statusLabels = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved' };
 
-        container.innerHTML = snap.docs.map(doc => {
-            const t = doc.data();
+        container.innerHTML = tickets.map(t => {
             const color = statusColors[t.status] || 'text-[#9db9a6]';
             const label = statusLabels[t.status] || t.status;
             const time = t.updated_at ? formatDate(t.updated_at.toDate ? t.updated_at.toDate() : new Date(t.updated_at)) : '';
-            const unread = t.unread_admin > 0 ? `<span class="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"></span>` : '';
+            const unread = t.unread_admin > 0 ? `<span class="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0 mt-1"></span>` : '';
+            const deviceCode = t.device_id ? (uniqueCodeMap[t.device_id] || t.device_id) : '—';
             return `<div class="p-4 hover:bg-[#223026] cursor-pointer transition-colors" onclick="navigateToPage('support')">
                 <div class="flex items-start gap-2">
                     ${unread}
                     <div class="flex-1 min-w-0">
                         <p class="text-white text-sm font-medium truncate">${t.subject || 'No subject'}</p>
-                        <p class="text-[#9db9a6] text-xs mt-0.5">${t.farmer_name || 'Unknown'} · ${t.device_id || '—'}</p>
+                        <p class="text-[#9db9a6] text-xs mt-0.5 truncate">
+                            ${t.farmer_name || 'Unknown'}
+                            <span class="mx-1 opacity-40">·</span>
+                            <span class="font-mono text-primary/70">${deviceCode}</span>
+                        </p>
                         <div class="flex items-center justify-between mt-1">
                             <span class="text-xs font-medium ${color}">${label}</span>
                             <span class="text-[#9db9a6] text-xs">${time}</span>
