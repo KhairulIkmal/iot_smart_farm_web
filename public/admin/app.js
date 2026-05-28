@@ -149,7 +149,7 @@ function navigateToPage(pageName) {
         }
     });
 
-    document.querySelectorAll('[id^="page-"]').forEach(page => {
+    document.querySelectorAll('div[id^="page-"]').forEach(page => {
         page.classList.add('hidden');
     });
 
@@ -369,22 +369,16 @@ async function loadRecentUsers() {
     try {
         const snapshot = await db.collection('users').get();
 
-        // Convert to array and sort by created_at in JavaScript
         const users = [];
-        snapshot.forEach(doc => {
-            users.push({ id: doc.id, ...doc.data() });
-        });
+        snapshot.forEach(doc => users.push({ id: doc.id, ...doc.data() }));
 
-        // Sort by created_at (newest first)
         users.sort((a, b) => {
-            const timeA = a.created_at ? a.created_at.toMillis() : (a.createdAt ? a.createdAt.toMillis() : 0);
-            const timeB = b.created_at ? b.created_at.toMillis() : (b.createdAt ? b.createdAt.toMillis() : 0);
-            return timeB - timeA;
+            const tA = a.created_at ? a.created_at.toMillis() : (a.createdAt ? a.createdAt.toMillis() : 0);
+            const tB = b.created_at ? b.created_at.toMillis() : (b.createdAt ? b.createdAt.toMillis() : 0);
+            return tB - tA;
         });
 
-        // Take only the 3 most recent users
         const recentUsers = users.slice(0, 3);
-
         const tbody = document.getElementById('recent-users-tbody');
         tbody.innerHTML = '';
 
@@ -393,21 +387,74 @@ async function loadRecentUsers() {
             return;
         }
 
-        recentUsers.forEach(user => {
-            const statusClass = user.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
-                               user.status === 'inactive' ? 'bg-red-500/10 text-red-500' :
-                               'bg-green-500/10 text-green-500';
-            const statusText = user.status === 'pending' ? 'Pending' :
-                             user.status === 'inactive' ? 'Inactive' : 'Active';
+        // ── Fetch crops for these users to get device IDs ─────────────
+        const farmerIds = recentUsers.map(u => u.uid || u.id).filter(Boolean);
+        const deviceIdByFarmer = {}; // farmerId → unique_code string
 
-            // Profile photo or avatar with initial
+        if (farmerIds.length) {
+            // Query crops in batches of 10 (Firestore whereIn limit)
+            for (let i = 0; i < farmerIds.length; i += 10) {
+                const batch = farmerIds.slice(i, i + 10);
+                try {
+                    const cropsSnap = await db.collection('crops')
+                        .where('farmer_id', 'in', batch)
+                        .where('status', '==', 'active')
+                        .get();
+
+                    // Collect unique device_ids per farmer
+                    const devicesByFarmer = {};
+                    cropsSnap.forEach(d => {
+                        const c = d.data();
+                        if (!c.farmer_id || !c.device_id) return;
+                        if (!devicesByFarmer[c.farmer_id]) devicesByFarmer[c.farmer_id] = [];
+                        devicesByFarmer[c.farmer_id].push(c.device_id);
+                    });
+
+                    // Fetch unique_code from devices collection
+                    const allDeviceIds = [...new Set(Object.values(devicesByFarmer).flat())];
+                    const uniqueCodeMap = {};
+                    for (let j = 0; j < allDeviceIds.length; j += 10) {
+                        const dBatch = allDeviceIds.slice(j, j + 10);
+                        try {
+                            const devSnap = await db.collection('devices')
+                                .where(firebase.firestore.FieldPath.documentId(), 'in', dBatch)
+                                .get();
+                            devSnap.forEach(d => { uniqueCodeMap[d.id] = d.data().unique_code || d.id; });
+                        } catch (_) {}
+                    }
+
+                    // Map farmer → display string (first device code, or "N devices")
+                    Object.entries(devicesByFarmer).forEach(([fid, dids]) => {
+                        const codes = dids.map(id => uniqueCodeMap[id] || id).filter(Boolean);
+                        if (codes.length === 1) deviceIdByFarmer[fid] = codes[0];
+                        else if (codes.length > 1) deviceIdByFarmer[fid] = `${codes.length} devices`;
+                    });
+                } catch (_) {}
+            }
+        }
+
+        // ── Render rows ───────────────────────────────────────────────
+        recentUsers.forEach(user => {
+            const farmerId   = user.uid || user.id;
+            const deviceCode = deviceIdByFarmer[farmerId];
+
+            const statusClass = user.status === 'pending'  ? 'bg-yellow-500/10 text-yellow-500' :
+                                user.status === 'inactive' ? 'bg-red-500/10 text-red-500' :
+                                'bg-green-500/10 text-green-500';
+            const statusText  = user.status === 'pending'  ? 'Pending' :
+                                user.status === 'inactive' ? 'Inactive' : 'Active';
+
             const avatarHTML = user.photoURL
                 ? `<img src="${user.photoURL}" alt="Profile" class="w-8 h-8 rounded-full object-cover">`
                 : `<div class="w-8 h-8 rounded-full bg-[#28392e] flex items-center justify-center text-white font-semibold">
                     ${(user.name || user.displayName || 'U')[0].toUpperCase()}
                    </div>`;
 
-            const row = `
+            const deviceCell = deviceCode
+                ? `<span class="font-mono text-xs text-white">${deviceCode}</span>`
+                : `<span class="text-[#9db9a6]">—</span>`;
+
+            tbody.innerHTML += `
                 <tr class="hover:bg-[#223026] transition-colors">
                     <td class="p-4">
                         <div class="flex items-center gap-3">
@@ -416,13 +463,11 @@ async function loadRecentUsers() {
                         </div>
                     </td>
                     <td class="p-4 text-[#9db9a6]">${user.email || 'N/A'}</td>
-                    <td class="p-4 text-[#9db9a6] font-mono text-xs">${user.device_id || '—'}</td>
+                    <td class="p-4">${deviceCell}</td>
                     <td class="p-4">
                         <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">${statusText}</span>
                     </td>
-                </tr>
-            `;
-            tbody.innerHTML += row;
+                </tr>`;
         });
     } catch (error) {
         console.error('Error loading recent users:', error);
@@ -911,80 +956,65 @@ async function loadAllUsers() {
         renderUsersTable(allUsers);
     } catch (error) {
         console.error('Error loading all users:', error);
-        document.getElementById('all-users-tbody').innerHTML =
-            '<tr><td colspan="6" class="p-4 text-center text-[#9db9a6]">Error loading users</td></tr>';
+        const grid = document.getElementById('farmers-grid');
+        if (grid) grid.innerHTML = '<div class="col-span-full p-8 text-center text-red-400">Error loading farmers</div>';
     }
 }
 
-// Render Users Table
+// Render Farmers Card Grid
 function renderUsersTable(users) {
-    const tbody = document.getElementById('all-users-tbody');
-    tbody.innerHTML = '';
+    const grid = document.getElementById('farmers-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
 
     if (users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-[#9db9a6]">No users found</td></tr>';
+        grid.innerHTML = '<div class="col-span-full p-10 text-center text-[#9db9a6]">No farmers found</div>';
         return;
     }
 
     users.forEach(user => {
-        const statusClass = user.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500' :
-                           user.status === 'inactive' ? 'bg-red-500/10 text-red-500' :
-                           'bg-green-500/10 text-green-500';
-        const statusText = user.status === 'pending' ? 'Pending' :
-                         user.status === 'inactive' ? 'Inactive' : 'Active';
+        const statusColor = user.status === 'pending' ? '#eab308' :
+                            user.status === 'inactive' ? '#ef4444' : '#22c55e';
+        const statusText  = user.status === 'pending' ? 'Pending' :
+                            user.status === 'inactive' ? 'Inactive' : 'Active';
 
-        const createdDate = user.created_at ?
-            new Date(user.created_at.toDate()).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            }) : (user.createdAt ?
-                new Date(user.createdAt.toDate()).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                }) : 'N/A');
+        const joinedDate = user.created_at ?
+            new Date(user.created_at.toDate()).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) :
+            (user.createdAt ?
+                new Date(user.createdAt.toDate()).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—');
 
-        // Profile photo or avatar with initial
+        const initials = (user.name || user.displayName || 'U')[0].toUpperCase();
         const avatarHTML = user.photoURL
-            ? `<img src="${user.photoURL}" alt="Profile" class="w-10 h-10 rounded-full object-cover">`
-            : `<div class="w-10 h-10 rounded-full bg-[#28392e] flex items-center justify-center text-white font-semibold">
-                ${(user.name || user.displayName || 'U')[0].toUpperCase()}
-               </div>`;
+            ? `<img src="${user.photoURL}" alt="Profile" class="w-12 h-12 rounded-full object-cover">`
+            : `<div class="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg" style="background:rgba(43,238,108,0.2);border:1.5px solid rgba(43,238,108,0.35)">${initials}</div>`;
 
-        const row = `
-            <tr class="hover:bg-[#223026] transition-colors">
-                <td class="p-4">
-                    <div class="flex items-center gap-3">
-                        ${avatarHTML}
-                        <div class="flex flex-col">
-                            <span class="text-white font-medium">${user.name || user.displayName || 'N/A'}</span>
-                            <span class="text-xs text-[#9db9a6]">${user.id}</span>
+        const safeName = (user.name || user.displayName || 'N/A').replace(/'/g, "\\'");
+        const card = `
+            <div onclick="viewUserDetails('${user.id}')"
+                 class="bg-[#1c271f] border border-[#3b5443] rounded-2xl p-5 cursor-pointer hover:border-primary/50 hover:shadow-lg transition-all group relative overflow-hidden">
+                <div class="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                     style="background:linear-gradient(135deg,rgba(43,238,108,0.04) 0%,transparent 60%)"></div>
+                <div class="flex items-center gap-4">
+                    ${avatarHTML}
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <p class="text-white font-semibold truncate">${user.name || user.displayName || 'N/A'}</p>
+                            <span class="flex-shrink-0 w-2 h-2 rounded-full" style="background:${statusColor}" title="${statusText}"></span>
                         </div>
+                        <p class="text-[#9db9a6] text-xs truncate mt-0.5">${user.email || '—'}</p>
+                        <p class="text-[#9db9a6] text-xs truncate mt-0.5">
+                            <span class="material-symbols-outlined text-[13px] align-middle mr-0.5">grass</span>${user.farm_name || 'No farm set'}
+                        </p>
                     </div>
-                </td>
-                <td class="p-4 text-[#9db9a6]">${user.email || 'N/A'}</td>
-                <td class="p-4 text-[#9db9a6]">${user.farm_name || 'Not set'}</td>
-                <td class="p-4">
-                    <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">${statusText}</span>
-                </td>
-                <td class="p-4 text-[#9db9a6]">${createdDate}</td>
-                <td class="p-4 text-right">
-                    <div class="flex items-center justify-end gap-2">
-                        <button onclick="viewUserDetails('${user.id}')" class="text-[#9db9a6] hover:text-primary transition-colors" title="View Details">
-                            <span class="material-symbols-outlined text-[20px]">visibility</span>
-                        </button>
-                        <button onclick="editUser('${user.id}')" class="text-[#9db9a6] hover:text-primary transition-colors" title="Edit User">
-                            <span class="material-symbols-outlined text-[20px]">edit</span>
-                        </button>
-                        <button onclick="deleteUser('${user.id}', '${user.name || user.email}')" class="text-[#9db9a6] hover:text-red-500 transition-colors" title="Delete User">
-                            <span class="material-symbols-outlined text-[20px]">delete</span>
-                        </button>
-                    </div>
-                </td>
-            </tr>
+                    <span class="material-symbols-outlined text-[#3b5443] group-hover:text-primary/50 transition-colors flex-shrink-0">chevron_right</span>
+                </div>
+                <div class="flex items-center justify-between mt-4 pt-3 border-t border-[#3b5443]">
+                    <span class="text-[#9db9a6] text-xs">Joined ${joinedDate}</span>
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-full" style="color:${statusColor};background:${statusColor}1a">${statusText}</span>
+                </div>
+            </div>
         `;
-        tbody.innerHTML += row;
+        grid.innerHTML += card;
     });
 }
 
@@ -1009,187 +1039,281 @@ document.getElementById('filter-user-status')?.addEventListener('change', (e) =>
     renderUsersTable(filteredUsers);
 });
 
-// View User Details
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Copy text to clipboard and briefly flash the button icon
+function _copyToClipboard(text, iconEl) {
+    if (!text || text === '—') return;
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = iconEl.textContent;
+        iconEl.textContent = 'check_circle';
+        iconEl.style.color = '#22c55e';
+        setTimeout(() => { iconEl.textContent = orig; iconEl.style.color = ''; }, 1500);
+    });
+}
+
+// Build an inline copyable field: value + small copy icon button
+function _copyableField(elId, text) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    const safeText = (text || '—').replace(/</g, '&lt;');
+    el.innerHTML = `
+        <span class="flex-1 break-all">${safeText}</span>
+        ${text ? `<button onclick="_copyToClipboard('${text.replace(/'/g,"\\'")}', this.querySelector('.material-symbols-outlined'))"
+            class="ml-2 flex-shrink-0 text-[#9db9a6] hover:text-primary transition-colors" title="Copy">
+            <span class="material-symbols-outlined text-[16px]">content_copy</span>
+        </button>` : ''}`;
+    el.classList.add('flex', 'items-center');
+}
+
+// Open crop photo lightbox
+function _openCropLightbox(url, label) {
+    const lb = document.createElement('div');
+    lb.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;backdrop-filter:blur(4px);';
+    lb.innerHTML = `
+        <img src="${url}" alt="${label}" style="max-width:90vw;max-height:80vh;border-radius:12px;box-shadow:0 25px 60px rgba(0,0,0,0.6);">
+        <p style="color:#fff;margin-top:14px;font-size:14px;opacity:0.8;">${label}</p>
+        <button style="position:absolute;top:20px;right:24px;background:rgba(255,255,255,0.1);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:20px;display:flex;align-items:center;justify-content:center;" onclick="this.parentElement.remove()">✕</button>`;
+    lb.addEventListener('click', e => { if (e.target === lb) lb.remove(); });
+    document.body.appendChild(lb);
+}
+
+// ── View User Details (new tabbed modal) ──────────────────────────────────────
 async function viewUserDetails(userId) {
     const user = allUsers.find(u => u.id === userId);
     if (!user) return;
 
     const modal = document.getElementById('user-details-modal');
 
-    // Basic user info
+    // ── Hero section ──────────────────────────────────────────────────
+    const initials = (user.name || user.displayName || 'U')[0].toUpperCase();
+    const photoEl  = document.getElementById('modal-user-photo');
+    if (user.photoURL) {
+        photoEl.innerHTML = `<img src="${user.photoURL}" alt="Profile" class="w-full h-full object-cover" style="cursor:pointer" onclick="_openCropLightbox('${user.photoURL}','${(user.name||'').replace(/'/g,"\\'")}')">`;
+    } else {
+        photoEl.textContent = initials;
+    }
+
     document.getElementById('modal-user-name').textContent = user.name || user.displayName || 'N/A';
-    document.getElementById('modal-user-email').textContent = user.email || 'N/A';
-    document.getElementById('modal-user-farm').textContent = user.farm_name || 'Not set';
-    document.getElementById('modal-user-phone').textContent = user.phone || user.phoneNumber || 'Not set';
+
+    // Email — mailto link
+    const emailEl = document.getElementById('modal-user-email');
+    if (user.email) {
+        emailEl.innerHTML = `<a href="mailto:${user.email}" class="hover:text-primary transition-colors inline-flex items-center gap-1" title="Send email">
+            <span class="material-symbols-outlined text-[14px]">mail</span>${user.email}</a>`;
+    } else { emailEl.textContent = '—'; }
+
+    document.getElementById('modal-user-id-inline').textContent = userId;
+
+    const joinedDate = user.created_at ?
+        new Date(user.created_at.toDate()).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) :
+        (user.createdAt ?
+            new Date(user.createdAt.toDate()).toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }) : '—');
+    document.getElementById('modal-user-joined').textContent = joinedDate;
+
+    const statusBadge = document.getElementById('modal-user-status-badge');
+    const statusColors = { pending:'bg-yellow-500/15 text-yellow-400', inactive:'bg-red-500/15 text-red-400', active:'bg-primary/15 text-primary' };
+    statusBadge.className = `px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusColors[user.status] || statusColors.active}`;
+    statusBadge.textContent = user.status ? (user.status[0].toUpperCase() + user.status.slice(1)) : 'Active';
+
+    // ── Stats (load async) ────────────────────────────────────────────
+    document.getElementById('modal-stat-crops').textContent   = '…';
+    document.getElementById('modal-stat-devices').textContent = '…';
+    document.getElementById('modal-stat-tickets').textContent = '…';
+
+    const farmerId = user.uid || userId;
+    Promise.all([
+        db.collection('crops').where('farmer_id', '==', farmerId).get(),
+        db.collection('support_tickets').where('farmer_uid', '==', farmerId).get(),
+    ]).then(([cropsSnap, ticketsSnap]) => {
+        const deviceIds = new Set();
+        cropsSnap.forEach(d => { if (d.data().device_id) deviceIds.add(d.data().device_id); });
+        document.getElementById('modal-stat-crops').textContent   = cropsSnap.size;
+        document.getElementById('modal-stat-devices').textContent = deviceIds.size;
+        document.getElementById('modal-stat-tickets').textContent = ticketsSnap.size;
+    }).catch(() => {});
+
+    // ── Profile tab ───────────────────────────────────────────────────
+    // Phone — tel link
+    const phoneEl = document.getElementById('modal-user-phone');
+    const phoneNum = user.phone || user.phoneNumber;
+    if (phoneNum) {
+        phoneEl.innerHTML = `<a href="tel:${phoneNum}" class="hover:text-primary transition-colors inline-flex items-center gap-1" title="Call">
+            <span class="material-symbols-outlined text-[14px]">call</span>${phoneNum}</a>`;
+    } else { phoneEl.textContent = '—'; }
+
     document.getElementById('modal-user-role').textContent = user.role || 'farmer';
-    document.getElementById('modal-user-status').textContent = user.status || 'active';
-    document.getElementById('modal-user-id').textContent = userId;
-    document.getElementById('modal-user-uid').textContent = user.uid || 'N/A';
 
-    // Password - Firebase Auth doesn't expose passwords, so check if stored in Firestore
-    const passwordElement = document.getElementById('modal-user-password');
+    // Copyable IDs
+    _copyableField('modal-user-id',  userId);
+    _copyableField('modal-user-uid', user.uid);
+
+    const tsOpts = { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' };
+    document.getElementById('modal-user-created').textContent =
+        user.created_at ? new Date(user.created_at.toDate()).toLocaleString('en-US', tsOpts) :
+        (user.createdAt ? new Date(user.createdAt.toDate()).toLocaleString('en-US', tsOpts) : '—');
+    document.getElementById('modal-user-updated').textContent =
+        user.updated_at ? new Date(user.updated_at.toDate()).toLocaleString('en-US', tsOpts) :
+        (user.updatedAt ? new Date(user.updatedAt.toDate()).toLocaleString('en-US', tsOpts) : '—');
+
+    // Password toggle
+    const passwordElement   = document.getElementById('modal-user-password');
     const togglePasswordBtn = document.getElementById('toggle-password-visibility');
-
-    // Store password state
+    const actualPassword    = user.password || null;
     let passwordVisible = false;
-    let actualPassword = user.password || null;
-
-    // Display password (masked by default)
     if (actualPassword) {
         passwordElement.textContent = '••••••••';
         passwordElement.dataset.password = actualPassword;
-
-        // Remove any existing event listeners by cloning the button
         if (togglePasswordBtn) {
+            togglePasswordBtn.style.display = '';
             const newToggleBtn = togglePasswordBtn.cloneNode(true);
             togglePasswordBtn.parentNode.replaceChild(newToggleBtn, togglePasswordBtn);
-
-            // Add click event to toggle password visibility
             newToggleBtn.addEventListener('click', () => {
                 passwordVisible = !passwordVisible;
-                const pwdElement = document.getElementById('modal-user-password');
-                const icon = newToggleBtn.querySelector('.material-symbols-outlined');
-
-                if (passwordVisible) {
-                    pwdElement.textContent = pwdElement.dataset.password;
-                    icon.textContent = 'visibility_off';
-                } else {
-                    pwdElement.textContent = '••••••••';
-                    icon.textContent = 'visibility';
-                }
+                const pwdEl = document.getElementById('modal-user-password');
+                const icon  = newToggleBtn.querySelector('.material-symbols-outlined');
+                pwdEl.textContent = passwordVisible ? pwdEl.dataset.password : '••••••••';
+                icon.textContent  = passwordVisible ? 'visibility_off' : 'visibility';
             });
         }
     } else {
         passwordElement.textContent = 'Not available';
         passwordElement.dataset.password = '';
-        if (togglePasswordBtn) {
-            togglePasswordBtn.style.display = 'none';
-        }
+        if (togglePasswordBtn) togglePasswordBtn.style.display = 'none';
     }
 
-    // Photo URL
-    if (user.photoURL) {
-        document.getElementById('modal-user-photo').innerHTML = `<img src="${user.photoURL}" alt="Profile" class="w-20 h-20 rounded-full object-cover">`;
-    } else {
-        document.getElementById('modal-user-photo').innerHTML = `<div class="w-20 h-20 rounded-full bg-[#28392e] flex items-center justify-center text-white font-bold text-2xl">${(user.name || 'U')[0].toUpperCase()}</div>`;
-    }
+    // ── Farm tab (load async) ─────────────────────────────────────────
+    document.getElementById('modal-user-farm').textContent        = user.farm_name || '—';
+    document.getElementById('modal-farm-size').textContent        = '…';
+    document.getElementById('modal-farm-location').textContent    = '…';
+    document.getElementById('modal-farm-coordinates').textContent = '';
 
-    // Timestamps - check both snake_case and camelCase field names
-    const createdDate = user.created_at ?
-        new Date(user.created_at.toDate()).toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        }) : (user.createdAt ?
-            new Date(user.createdAt.toDate()).toLocaleString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : 'N/A');
-    document.getElementById('modal-user-created').textContent = createdDate;
+    db.collection('users').doc(userId).collection('farm').doc('details').get().then(doc => {
+        const d = doc.exists ? doc.data() : {};
+        document.getElementById('modal-farm-size').textContent = d.size ? `${d.size} hectares` : '—';
+    }).catch(() => { document.getElementById('modal-farm-size').textContent = '—'; });
 
-    const updatedDate = user.updated_at ?
-        new Date(user.updated_at.toDate()).toLocaleString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        }) : (user.updatedAt ?
-            new Date(user.updatedAt.toDate()).toLocaleString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }) : 'N/A');
-    document.getElementById('modal-user-updated').textContent = updatedDate;
+    db.collection('users').doc(userId).collection('farm').doc('location').get().then(doc => {
+        const d = doc.exists ? doc.data() : {};
+        const locEl   = document.getElementById('modal-farm-location');
+        const coordEl = document.getElementById('modal-farm-coordinates');
+        const hasCoords = d.latitude && d.longitude;
+        const mapsUrl = hasCoords
+            ? `https://www.google.com/maps?q=${d.latitude},${d.longitude}`
+            : (d.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.address)}` : null);
 
-    // Load farm details from subcollection
-    try {
-        const farmDetailsDoc = await db.collection('users')
-            .doc(userId)
-            .collection('farm')
-            .doc('details')
-            .get();
-
-        if (farmDetailsDoc.exists) {
-            const farmData = farmDetailsDoc.data();
-            document.getElementById('modal-farm-size').textContent = farmData.size ? `${farmData.size} hectares` : 'Not set';
+        if (d.address && mapsUrl) {
+            locEl.innerHTML = `<a href="${mapsUrl}" target="_blank" rel="noopener"
+                class="inline-flex items-center gap-1.5 hover:text-primary transition-colors group" title="Open in Google Maps">
+                <span class="material-symbols-outlined text-[16px] text-primary">location_on</span>
+                ${d.address}
+                <span class="material-symbols-outlined text-[13px] opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+            </a>`;
         } else {
-            document.getElementById('modal-farm-size').textContent = 'Not set';
+            locEl.textContent = d.address || '—';
         }
 
-        // Load farm location
-        const farmLocationDoc = await db.collection('users')
-            .doc(userId)
-            .collection('farm')
-            .doc('location')
-            .get();
-
-        if (farmLocationDoc.exists) {
-            const locationData = farmLocationDoc.data();
-            document.getElementById('modal-farm-location').textContent = locationData.address || 'Not set';
-            document.getElementById('modal-farm-coordinates').textContent =
-                locationData.latitude && locationData.longitude
-                    ? `${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}`
-                    : 'Not set';
+        if (hasCoords) {
+            const coordStr = `${d.latitude.toFixed(6)}, ${d.longitude.toFixed(6)}`;
+            coordEl.innerHTML = `<a href="${mapsUrl}" target="_blank" rel="noopener"
+                class="inline-flex items-center gap-1 text-[#9db9a6] hover:text-primary transition-colors font-mono text-xs group" title="Open pinned location">
+                <span class="material-symbols-outlined text-[13px]">my_location</span>
+                ${coordStr}
+                <span class="material-symbols-outlined text-[11px] opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+            </a>`;
         } else {
-            document.getElementById('modal-farm-location').textContent = 'Not set';
-            document.getElementById('modal-farm-coordinates').textContent = 'Not set';
+            coordEl.textContent = '';
         }
-    } catch (error) {
-        console.error('Error loading farm details:', error);
-        document.getElementById('modal-farm-size').textContent = 'Error loading';
-        document.getElementById('modal-farm-location').textContent = 'Error loading';
-        document.getElementById('modal-farm-coordinates').textContent = 'Error loading';
-    }
+    }).catch(() => { document.getElementById('modal-farm-location').textContent = '—'; });
 
-    // Load user's crops - query by Firebase Auth UID, not custom user ID
-    try {
-        // Try querying by Firebase Auth UID first (user.uid), then fallback to custom userId
-        let cropsSnapshot = await db.collection('crops')
-            .where('farmer_id', '==', user.uid || userId)
-            .get();
+    // ── Crops tab (load async) ────────────────────────────────────────
+    const cropsContainer = document.getElementById('modal-user-crops');
+    cropsContainer.innerHTML = '<div class="text-center py-10 text-[#9db9a6]">Loading crops…</div>';
 
-        // If no results and user.uid exists, also try with custom userId
-        if (cropsSnapshot.empty && user.uid && user.uid !== userId) {
-            cropsSnapshot = await db.collection('crops')
-                .where('farmer_id', '==', userId)
-                .get();
-        }
-
-        const cropsContainer = document.getElementById('modal-user-crops');
-        if (cropsSnapshot.empty) {
-            cropsContainer.innerHTML = '<p class="text-[#9db9a6] text-sm">No crops planted yet</p>';
-        } else {
-            let cropsHTML = '<div class="space-y-2">';
-            cropsSnapshot.forEach(doc => {
-                const crop = doc.data();
-                const statusClass = crop.status === 'active' ? 'bg-green-500/10 text-green-500' :
-                                  crop.status === 'harvested' ? 'bg-blue-500/10 text-blue-500' :
-                                  'bg-red-500/10 text-red-500';
-
-                cropsHTML += `
-                    <div class="flex items-center justify-between p-2 bg-[#28392e] rounded">
-                        <div>
-                            <p class="text-white font-medium">${crop.crop_type || 'Unknown'}</p>
-                            <p class="text-xs text-[#9db9a6]">Device: ${crop.device_id || 'N/A'}</p>
+    db.collection('crops').where('farmer_id', '==', farmerId).get()
+        .then(snap => {
+            if (snap.empty) {
+                cropsContainer.innerHTML = `
+                    <div class="text-center py-10">
+                        <span class="material-symbols-outlined text-[48px] text-[#3b5443]">grass</span>
+                        <p class="text-[#9db9a6] text-sm mt-2">No crops planted yet</p>
+                    </div>`;
+                return;
+            }
+            const statusLabel = { active:'Active', harvested:'Harvested', inactive:'Removed' };
+            const statusStyle = {
+                active:   'color:#22c55e;background:rgba(34,197,94,0.12)',
+                harvested:'color:#3b82f6;background:rgba(59,130,246,0.12)',
+                inactive: 'color:#ef4444;background:rgba(239,68,68,0.12)',
+            };
+            let html = '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">';
+            snap.forEach(doc => {
+                const crop    = doc.data();
+                const st      = crop.status || 'active';
+                const label   = crop.crop_type || 'Unknown';
+                const imgUrl  = crop.image_url || '';
+                const clickFn = imgUrl ? `onclick="_openCropLightbox('${imgUrl.replace(/'/g,"\\'")}','${label.replace(/'/g,"\\'")}');event.stopPropagation()"` : '';
+                const imgTag  = imgUrl
+                    ? `<div class="relative overflow-hidden" style="height:112px;cursor:zoom-in" ${clickFn}>
+                           <img src="${imgUrl}" alt="${label}" class="w-full h-full object-cover transition-transform duration-300 hover:scale-105">
+                           <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" style="background:rgba(0,0,0,0.35)">
+                               <span class="material-symbols-outlined text-white text-[28px]">zoom_in</span>
+                           </div>
+                       </div>`
+                    : `<div class="w-full flex items-center justify-center" style="height:112px;background:#1c271f">
+                           <span class="material-symbols-outlined text-[40px]" style="color:#3b5443">grass</span>
+                       </div>`;
+                html += `
+                    <div class="bg-[#1c271f] rounded-xl overflow-hidden border border-[#3b5443] hover:border-primary/40 transition-colors">
+                        ${imgTag}
+                        <div class="p-3">
+                            <p class="text-white font-semibold text-sm truncate">${label}</p>
+                            <p class="text-[#9db9a6] text-xs truncate mt-0.5 flex items-center gap-0.5">
+                                <span class="material-symbols-outlined text-[12px]">memory</span>${crop.device_id || '—'}
+                            </p>
+                            <span class="inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium" style="${statusStyle[st] || statusStyle.active}">${statusLabel[st] || st}</span>
                         </div>
-                        <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">${crop.status || 'active'}</span>
-                    </div>
-                `;
+                    </div>`;
             });
-            cropsHTML += '</div>';
-            cropsContainer.innerHTML = cropsHTML;
-        }
-    } catch (error) {
-        console.error('Error loading crops:', error);
-        document.getElementById('modal-user-crops').innerHTML = '<p class="text-red-500 text-sm">Error loading crops</p>';
+            html += '</div>';
+            cropsContainer.innerHTML = html;
+        })
+        .catch(() => { cropsContainer.innerHTML = '<p class="text-red-400 text-sm">Error loading crops</p>'; });
+
+    // ── Tab switching ─────────────────────────────────────────────────
+    const tabPanels = { profile:'modal-tab-profile', farm:'modal-tab-farm', crops:'modal-tab-crops' };
+    modal.querySelectorAll('.modal-tab-btn').forEach(btn => {
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', () => {
+            modal.querySelectorAll('.modal-tab-btn').forEach(b => {
+                b.classList.remove('text-primary', 'border-primary');
+                b.classList.add('text-[#9db9a6]', 'border-transparent');
+            });
+            newBtn.classList.add('text-primary', 'border-primary');
+            newBtn.classList.remove('text-[#9db9a6]', 'border-transparent');
+            Object.values(tabPanels).forEach(id => document.getElementById(id)?.classList.add('hidden'));
+            const panelId = tabPanels[newBtn.dataset.tab];
+            if (panelId) document.getElementById(panelId)?.classList.remove('hidden');
+        });
+    });
+    // Reset to Profile tab
+    Object.values(tabPanels).forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    document.getElementById('modal-tab-profile')?.classList.remove('hidden');
+    modal.querySelectorAll('.modal-tab-btn').forEach(b => {
+        const isProfile = b.dataset.tab === 'profile';
+        b.classList.toggle('text-primary', isProfile);
+        b.classList.toggle('border-primary', isProfile);
+        b.classList.toggle('text-[#9db9a6]', !isProfile);
+        b.classList.toggle('border-transparent', !isProfile);
+    });
+
+    // ── Delete button ─────────────────────────────────────────────────
+    const deleteBtn = document.getElementById('modal-delete-user-btn');
+    if (deleteBtn) {
+        const newDeleteBtn = deleteBtn.cloneNode(true);
+        deleteBtn.parentNode.replaceChild(newDeleteBtn, deleteBtn);
+        newDeleteBtn.addEventListener('click', () => deleteUser(userId, user.name || user.email));
     }
 
     modal.classList.remove('hidden');
@@ -3405,8 +3529,103 @@ function generateCharts(data) {
     }
 }
 
-// Export Report as PDF
-document.getElementById('export-report-btn')?.addEventListener('click', async () => {
+// ── Report Preview ────────────────────────────────────────────────────────────
+document.getElementById('export-report-btn')?.addEventListener('click', () => {
+    openReportPreview();
+});
+
+function openReportPreview() {
+    const now        = new Date();
+    const adminName  = document.getElementById('admin-name-text')?.textContent || 'Admin';
+    const farmSelect = document.getElementById('analytics-farm-filter');
+    const cropSelect = document.getElementById('analytics-crop-filter');
+    const farmLabel  = farmSelect?.options[farmSelect.selectedIndex]?.text || 'All Farms';
+    const cropLabel  = (cropSelect && cropSelect.options.length > 0)
+        ? cropSelect.options[cropSelect.selectedIndex]?.text || 'All Crops'
+        : 'All Crops';
+    const timeLabel  = selectedTimeRange === '24h' ? 'Last 24 Hours'
+                     : selectedTimeRange === '7d'  ? 'Last 7 Days'
+                     : selectedTimeRange === '30d' ? 'Last 30 Days'
+                     : 'All Time';
+
+    // Populate metadata
+    document.getElementById('rp-farm').textContent  = farmLabel;
+    document.getElementById('rp-crop').textContent  = cropLabel;
+    document.getElementById('rp-range').textContent = timeLabel;
+    document.getElementById('rp-admin').textContent = adminName;
+    document.getElementById('rp-date').textContent  = now.toLocaleString('en-MY', {
+        year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+
+    // Populate stats
+    document.getElementById('rp-soil').textContent = document.getElementById('avg-soil-moisture')?.textContent || '—';
+    document.getElementById('rp-temp').textContent = document.getElementById('avg-temperature')?.textContent || '—';
+    document.getElementById('rp-ph').textContent   = document.getElementById('avg-ph')?.textContent || '—';
+
+    // Chart thumbnails
+    const chartsContainer = document.getElementById('rp-charts');
+    chartsContainer.innerHTML = '';
+    const chartDefs = [
+        { id:'device-status-pie',   label:'Device Status',       color:'#2bec6c' },
+        { id:'tickets-pie',         label:'Ticket Status',       color:'#c084fc' },
+        { id:'crop-dist-bar',       label:'Crop Distribution',   color:'#fb923c' },
+        { id:'soil-moisture-chart', label:'Soil Moisture Trend', color:'#4ade80' },
+        { id:'temperature-chart',   label:'Temperature Trend',   color:'#fb923c' },
+        { id:'humidity-chart',      label:'Humidity Trend',      color:'#2dd4bf' },
+        { id:'ph-chart',            label:'pH Level Trend',      color:'#c084fc' },
+        { id:'water-level-chart',   label:'Water Tank Level',    color:'#60a5fa' },
+    ];
+    chartDefs.forEach(({ id, label, color }) => {
+        const canvas = document.getElementById(id);
+        const wrap   = document.createElement('div');
+        wrap.className = 'bg-[#1c271f] rounded-xl border border-[#3b5443] overflow-hidden';
+        if (canvas) {
+            try {
+                const imgSrc = canvas.toDataURL('image/png');
+                wrap.innerHTML = `
+                    <div class="px-4 pt-3 pb-1 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${color}"></span>
+                        <p class="text-white text-xs font-semibold">${label}</p>
+                    </div>
+                    <img src="${imgSrc}" alt="${label}" class="w-full" style="display:block">`;
+            } catch {
+                wrap.innerHTML = `<p class="text-[#9db9a6] text-xs p-4">Chart unavailable</p>`;
+            }
+        } else {
+            wrap.innerHTML = `<p class="text-[#9db9a6] text-xs p-4">No data for ${label}</p>`;
+        }
+        chartsContainer.appendChild(wrap);
+    });
+
+    // Wire buttons
+    const modal      = document.getElementById('report-preview-modal');
+    const closePreview = () => modal.classList.add('hidden');
+
+    const closeBtn   = document.getElementById('close-report-preview');
+    const cancelBtn  = document.getElementById('rp-cancel-btn');
+    const dlBtn      = document.getElementById('rp-download-btn');
+
+    const newClose  = closeBtn.cloneNode(true);
+    const newCancel = cancelBtn.cloneNode(true);
+    const newDl     = dlBtn.cloneNode(true);
+    closeBtn.parentNode.replaceChild(newClose, closeBtn);
+    cancelBtn.parentNode.replaceChild(newCancel, cancelBtn);
+    dlBtn.parentNode.replaceChild(newDl, dlBtn);
+
+    newClose.addEventListener('click',  closePreview);
+    newCancel.addEventListener('click', closePreview);
+    modal.addEventListener('click', e => { if (e.target === modal) closePreview(); });
+
+    newDl.addEventListener('click', async () => {
+        closePreview();
+        await generateAndDownloadPDF();
+    });
+
+    modal.classList.remove('hidden');
+}
+
+// ── PDF Generation ────────────────────────────────────────────────────────────
+async function generateAndDownloadPDF() {
     const btn = document.getElementById('export-report-btn');
     const originalHTML = btn.innerHTML;
 
@@ -3414,210 +3633,299 @@ document.getElementById('export-report-btn')?.addEventListener('click', async ()
         btn.disabled = true;
         btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">hourglass_empty</span><span class="font-medium">Generating PDF...</span>';
 
-        if (!window.jspdf) {
-            throw new Error('PDF library not loaded. Please refresh the page and try again.');
-        }
+        if (!window.jspdf) throw new Error('PDF library not loaded. Please refresh and try again.');
 
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-        const pageW = 210;
-        const pageH = 297;
-        const margin = 15;
-        const contentW = pageW - margin * 2;
+        const pageW = 210, pageH = 297, margin = 15;
+        const contentW = pageW - margin * 2;          // 180 mm
+        const halfW    = (contentW - 3) / 2;          // 88.5 mm (2-col layout)
+        const thirdW   = (contentW - 6) / 3;          // 58 mm  (3-col layout)
+        const quarterW = (contentW - 9) / 4;          // 42.75 mm (4-col KPIs)
 
-        // Color helpers
         const C = {
-            green:   [43, 238, 108],
-            darkBg:  [16, 34, 22],
-            surface: [28, 39, 31],
-            surface2:[35, 53, 41],
-            muted:   [157, 185, 166],
-            white:   [255, 255, 255],
-            soil:    [74, 222, 128],
-            temp:    [251, 146, 60],
-            ph:      [192, 132, 252],
-            water:   [96, 165, 250],
+            green:    [43, 238, 108],
+            darkBg:   [16, 34, 22],
+            surface:  [28, 39, 31],
+            surface2: [40, 57, 46],
+            muted:    [157, 185, 166],
+            white:    [255, 255, 255],
+            soil:     [74, 222, 128],
+            temp:     [251, 146, 60],
+            humidity: [45, 212, 191],
+            ph:       [192, 132, 252],
+            water:    [96, 165, 250],
+            blue:     [96, 165, 250],
+            orange:   [251, 146, 60],
+            purple:   [192, 132, 252],
         };
 
-        // ── HEADER (0..30mm) ──────────────────────────────────────────
-        doc.setFillColor(...C.darkBg);
-        doc.rect(0, 0, pageW, 30, 'F');
-
-        // Green left accent
-        doc.setFillColor(...C.green);
-        doc.rect(0, 0, 4, 30, 'F');
-
-        // Logo text
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(...C.green);
-        doc.text('AgroEzuran', margin + 4, 13);
-
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...C.muted);
-        doc.text('Smart Farm Management System  ·  Admin Analytics Report', margin + 4, 22);
-
-        // Generated info (right)
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: 'numeric' });
-        const timeStr = now.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+        const now       = new Date();
+        const dateStr   = now.toLocaleDateString('en-MY', { year:'numeric', month:'short', day:'numeric' });
+        const timeStr   = now.toLocaleTimeString('en-MY', { hour:'2-digit', minute:'2-digit' });
         const adminName = document.getElementById('admin-name-text')?.textContent || 'Admin';
 
-        doc.setFontSize(7.5);
-        doc.setTextColor(...C.muted);
-        doc.text(`Generated: ${dateStr}, ${timeStr}`, pageW - margin, 13, { align: 'right' });
-        doc.text(`By: ${adminName}`, pageW - margin, 21, { align: 'right' });
-
-        let y = 36;
-
-        // ── FILTER INFO (y..y+18) ─────────────────────────────────────
         const farmSelect = document.getElementById('analytics-farm-filter');
         const cropSelect = document.getElementById('analytics-crop-filter');
-        const farmLabel = farmSelect?.options[farmSelect.selectedIndex]?.text || 'All Farms';
-        const cropLabel = cropSelect && cropSelect.options.length > 0
-            ? cropSelect.options[cropSelect.selectedIndex]?.text || 'All Crops'
-            : 'All Crops';
-        const timeLabel = selectedTimeRange === '24h' ? 'Last 24 Hours'
-                        : selectedTimeRange === '7d' ? 'Last 7 Days'
-                        : selectedTimeRange === '30d' ? 'Last 30 Days'
-                        : 'All Time';
+        const farmLabel  = farmSelect?.options[farmSelect.selectedIndex]?.text || 'All Farms';
+        const cropLabel  = (cropSelect && cropSelect.options.length > 0)
+            ? cropSelect.options[cropSelect.selectedIndex]?.text || 'All Crops' : 'All Crops';
+        const timeLabel  = selectedTimeRange === '24h' ? 'Last 24 Hours'
+                         : selectedTimeRange === '7d'  ? 'Last 7 Days'
+                         : selectedTimeRange === '30d' ? 'Last 30 Days' : 'All Time';
 
-        doc.setFillColor(...C.surface);
-        doc.roundedRect(margin, y, contentW, 20, 2, 2, 'F');
-
-        const col = contentW / 3;
-        const filterFields = [
-            { label: 'FARM', value: farmLabel },
-            { label: 'CROP', value: cropLabel },
-            { label: 'TIME RANGE', value: timeLabel },
-        ];
-        filterFields.forEach((f, i) => {
-            const fx = margin + 6 + i * col;
-            doc.setFontSize(6.5);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...C.muted);
-            doc.text(f.label, fx, y + 8);
-
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...C.white);
-            doc.text(f.value, fx, y + 16);
-        });
-        doc.setFont('helvetica', 'normal');
-
-        y += 26;
-
-        // ── STATS CARDS (y..y+28) ─────────────────────────────────────
-        const avgSoil  = document.getElementById('avg-soil-moisture')?.textContent || '--';
-        const avgTemp  = document.getElementById('avg-temperature')?.textContent || '--';
-        const avgPh    = document.getElementById('avg-ph')?.textContent || '--';
-        const soilChg  = document.getElementById('soil-moisture-change')?.textContent || '';
-        const tempChg  = document.getElementById('temperature-change')?.textContent || '';
-        const phStat   = document.getElementById('ph-status')?.textContent || '';
-
-        const statCards = [
-            { label: 'AVG SOIL MOISTURE', value: avgSoil, sub: soilChg, accent: C.soil },
-            { label: 'AVG TEMPERATURE',   value: avgTemp,  sub: tempChg, accent: C.temp },
-            { label: 'pH LEVEL',          value: avgPh,    sub: phStat,  accent: C.ph   },
-        ];
-
-        const cardW = (contentW - 6) / 3;
-        statCards.forEach((card, i) => {
-            const cx = margin + i * (cardW + 3);
-
-            doc.setFillColor(...C.surface);
-            doc.roundedRect(cx, y, cardW, 30, 2, 2, 'F');
-
-            // Colored top bar
-            doc.setFillColor(...card.accent);
-            doc.roundedRect(cx, y, cardW, 2.5, 1, 1, 'F');
-
-            doc.setFontSize(6.5);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...C.muted);
-            doc.text(card.label, cx + cardW / 2, y + 10, { align: 'center' });
-
-            doc.setFontSize(15);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...C.white);
-            doc.text(card.value, cx + cardW / 2, y + 21, { align: 'center' });
-
+        // ── Helpers ───────────────────────────────────────────────────
+        function sectionLabel(text, y) {
+            doc.setFillColor(...C.green);
+            doc.rect(margin, y, 2.5, 5, 'F');
             doc.setFontSize(7.5);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(...card.accent);
-            doc.text(card.sub, cx + cardW / 2, y + 28, { align: 'center' });
-        });
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.green);
+            doc.text(text.toUpperCase(), margin + 5, y + 4);
+            return y + 9;
+        }
 
-        y += 38;
-
-        // ── SENSOR CHARTS ─────────────────────────────────────────────
-        const chartConfigs = [
-            { id: 'soil-moisture-chart', label: 'Soil Moisture Trend (%)', accent: C.soil },
-            { id: 'temperature-chart',   label: 'Temperature Trend (°C)',  accent: C.temp },
-            { id: 'water-level-chart',   label: 'Water Level Trend (%)',   accent: C.water },
-        ];
-
-        const containerH = 53; // total height of each chart box
-        const chartImgH  = 41; // height of the chart image inside the box
-
-        for (const chartCfg of chartConfigs) {
-            // Page break if needed (leave 15mm for footer)
-            if (y + containerH > pageH - 18) {
-                doc.addPage();
-                y = 15;
+        function embedChart(canvasId, x, y, w, h) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            try {
+                doc.addImage(canvas.toDataURL('image/png'), 'PNG', x, y, w, h);
+            } catch {
+                doc.setFontSize(7);
+                doc.setTextColor(...C.muted);
+                doc.text('No data available', x + w / 2, y + h / 2, { align: 'center' });
             }
+        }
 
+        // Draw a chart card with label, safe range label, and embedded canvas
+        function chartCard(x, y, w, h, canvasId, label, safeRange, accent) {
             doc.setFillColor(...C.surface);
-            doc.roundedRect(margin, y, contentW, containerH, 2, 2, 'F');
+            doc.roundedRect(x, y, w, h, 2, 2, 'F');
+            doc.setFillColor(...accent);
+            doc.roundedRect(x, y, w, 2.5, 1, 1, 'F');
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.white);
+            doc.text(label, x + 4, y + 9.5);
+            if (safeRange) {
+                doc.setFontSize(6);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(...C.muted);
+                doc.text(safeRange, x + w - 4, y + 9.5, { align: 'right' });
+            }
+            embedChart(canvasId, x + 3, y + 12, w - 6, h - 14);
+        }
 
-            // Left accent bar
-            doc.setFillColor(...chartCfg.accent);
-            doc.roundedRect(margin, y, 3, containerH, 1, 1, 'F');
+        // ════════════════════════════════════════════════════════════
+        // PAGE 1 — Overview
+        // ════════════════════════════════════════════════════════════
 
-            // Chart label
+        // ── Header ────────────────────────────────────────────────
+        doc.setFillColor(...C.darkBg);
+        doc.rect(0, 0, pageW, 35, 'F');
+        doc.setFillColor(...C.green);
+        doc.rect(0, 0, 4, 35, 'F');
+        // Bottom green line
+        doc.setFillColor(...C.surface2);
+        doc.rect(0, 34.5, pageW, 0.8, 'F');
+
+        doc.setFontSize(19);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.green);
+        doc.text('AgroEzuran', margin + 5, 16);
+
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...C.muted);
+        doc.text('Smart Farm Management System  ·  Admin Analytics Report', margin + 5, 24);
+
+        // "CONFIDENTIAL" tag
+        doc.setFillColor(...C.surface2);
+        doc.roundedRect(margin + 5, 26.5, 26, 5, 1, 1, 'F');
+        doc.setFontSize(5.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.green);
+        doc.text('CONFIDENTIAL', margin + 5 + 13, 30, { align: 'center' });
+
+        // Right side: generated info
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...C.muted);
+        doc.text(`Generated: ${dateStr}  ${timeStr}`, pageW - margin, 16, { align: 'right' });
+        doc.text(`By: ${adminName}`, pageW - margin, 24, { align: 'right' });
+
+        let y = 40;
+
+        // ── Filter / Scope Bar ─────────────────────────────────────
+        doc.setFillColor(...C.surface);
+        doc.roundedRect(margin, y, contentW, 18, 2, 2, 'F');
+        doc.setFillColor(...C.green);
+        doc.rect(margin, y, 2, 18, 'F');
+
+        [{ label:'FARM', value:farmLabel }, { label:'CROP', value:cropLabel }, { label:'TIME RANGE', value:timeLabel }]
+        .forEach((f, i) => {
+            const fx = margin + 5 + i * (contentW / 3);
+            doc.setFontSize(5.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...C.muted);
+            doc.text(f.label, fx, y + 7);
             doc.setFontSize(8.5);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(...C.white);
-            doc.text(chartCfg.label, margin + 8, y + 9);
+            doc.text(f.value, fx, y + 14);
+        });
+        doc.setFont('helvetica', 'normal');
+        y += 23;
+
+        // ── Section: Platform Overview ─────────────────────────────
+        y = sectionLabel('Platform Overview', y);
+
+        // KPI cards (4 in a row)
+        const kpis = [
+            { label:'Total Devices',   value: document.getElementById('kpi-total-devices')?.textContent || '—', sub: document.getElementById('kpi-utilization')?.textContent || '',          accent: C.green  },
+            { label:'Active Farmers',  value: document.getElementById('kpi-farmers')?.textContent || '—',        sub: 'registered users',                                                     accent: C.blue   },
+            { label:'Active Crops',    value: document.getElementById('kpi-crops')?.textContent || '—',          sub: 'currently monitored',                                                  accent: C.orange },
+            { label:'Support Tickets', value: document.getElementById('kpi-tickets')?.textContent || '—',        sub: document.getElementById('kpi-open-tickets')?.textContent || '0 open',  accent: C.purple },
+        ];
+        kpis.forEach((k, i) => {
+            const kx = margin + i * (quarterW + 3);
+            doc.setFillColor(...C.surface);
+            doc.roundedRect(kx, y, quarterW, 26, 2, 2, 'F');
+            doc.setFillColor(...k.accent);
+            doc.roundedRect(kx, y, quarterW, 2, 1, 1, 'F');
+            doc.setFontSize(15);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.white);
+            doc.text(k.value, kx + quarterW / 2, y + 14, { align: 'center' });
+            doc.setFontSize(6);
             doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...C.muted);
+            doc.text(k.label, kx + quarterW / 2, y + 20, { align: 'center' });
+            doc.setFontSize(5.5);
+            doc.setTextColor(...k.accent);
+            doc.text(k.sub, kx + quarterW / 2, y + 25, { align: 'center' });
+        });
+        y += 31;
 
-            // Embed chart image from canvas
-            const canvas = document.getElementById(chartCfg.id);
-            if (canvas) {
-                try {
-                    const imgData = canvas.toDataURL('image/png');
-                    doc.addImage(imgData, 'PNG', margin + 4, y + 11, contentW - 8, chartImgH);
-                } catch (e) {
-                    doc.setFontSize(8);
-                    doc.setTextColor(...C.muted);
-                    doc.text('No chart data available', margin + contentW / 2, y + containerH / 2 + 5, { align: 'center' });
-                }
-            }
+        // ── Section: Device & Crop Distribution ────────────────────
+        y = sectionLabel('Device & Crop Distribution', y);
 
-            y += containerH + 5;
-        }
+        const overviewH = 52;
+        [
+            { id:'device-status-pie', label:'Device Status',  accent: C.green  },
+            { id:'tickets-pie',       label:'Ticket Status',  accent: C.purple },
+            { id:'crop-dist-bar',     label:'Crop Types',     accent: C.orange },
+        ].forEach((oc, i) => {
+            const ox = margin + i * (thirdW + 3);
+            doc.setFillColor(...C.surface);
+            doc.roundedRect(ox, y, thirdW, overviewH, 2, 2, 'F');
+            doc.setFillColor(...oc.accent);
+            doc.roundedRect(ox, y, thirdW, 2.5, 1, 1, 'F');
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.white);
+            doc.text(oc.label, ox + thirdW / 2, y + 9, { align: 'center' });
+            embedChart(oc.id, ox + 3, y + 11, thirdW - 6, overviewH - 13);
+        });
+        y += overviewH + 5;
 
-        // ── FOOTER ────────────────────────────────────────────────────
+        // ── Section: Sensor Summary ────────────────────────────────
+        y = sectionLabel('Sensor Summary', y);
+
+        const avgSoil = document.getElementById('avg-soil-moisture')?.textContent || '—';
+        const avgTemp = document.getElementById('avg-temperature')?.textContent || '—';
+        const avgPh   = document.getElementById('avg-ph')?.textContent || '—';
+        const soilChg = document.getElementById('soil-moisture-change')?.textContent || '';
+        const tempChg = document.getElementById('temperature-change')?.textContent || '';
+        const phStat  = document.getElementById('ph-status')?.textContent || '';
+
+        [
+            { label:'Avg Soil Moisture', value:avgSoil, sub:soilChg, accent:C.soil,  range:'Safe: 20–90%'  },
+            { label:'Avg Temperature',   value:avgTemp, sub:tempChg, accent:C.temp,  range:'Safe: 10–40°C' },
+            { label:'Avg pH Level',      value:avgPh,   sub:phStat,  accent:C.ph,    range:'Safe: 5.0–8.0' },
+        ].forEach((s, i) => {
+            const sx = margin + i * (thirdW + 3);
+            doc.setFillColor(...C.surface);
+            doc.roundedRect(sx, y, thirdW, 32, 2, 2, 'F');
+            doc.setFillColor(...s.accent);
+            doc.roundedRect(sx, y, thirdW, 2.5, 1, 1, 'F');
+            doc.setFontSize(5.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...C.muted);
+            doc.text(s.label.toUpperCase(), sx + thirdW / 2, y + 9.5, { align: 'center' });
+            doc.setFontSize(16);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.white);
+            doc.text(s.value, sx + thirdW / 2, y + 21, { align: 'center' });
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...s.accent);
+            doc.text(s.sub, sx + thirdW / 2, y + 27, { align: 'center' });
+            doc.setFontSize(5.5);
+            doc.setTextColor(...C.muted);
+            doc.text(s.range, sx + thirdW / 2, y + 32, { align: 'center' });
+        });
+        // y after sensor stats — page 1 ends here
+
+        // ════════════════════════════════════════════════════════════
+        // PAGE 2 — Sensor Charts
+        // ════════════════════════════════════════════════════════════
+        doc.addPage();
+
+        // Slim continuation header
+        doc.setFillColor(...C.darkBg);
+        doc.rect(0, 0, pageW, 12, 'F');
+        doc.setFillColor(...C.green);
+        doc.rect(0, 0, 4, 12, 'F');
+        doc.setFillColor(...C.surface2);
+        doc.rect(0, 11.5, pageW, 0.8, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.green);
+        doc.text('AgroEzuran', margin + 5, 8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...C.muted);
+        doc.text('Sensor Charts', margin + 32, 8);
+        doc.text(`${farmLabel}  ·  ${timeLabel}  ·  Generated ${dateStr}`, pageW - margin, 8, { align: 'right' });
+
+        y = 18;
+        y = sectionLabel('Sensor Charts', y);
+
+        const chartH = 57;
+        const chartGap = 4;
+
+        // Row 1: Soil Moisture + Temperature
+        chartCard(margin,          y, halfW, chartH, 'soil-moisture-chart', 'Soil Moisture', 'Safe: 20–90%',  C.soil);
+        chartCard(margin + halfW + 3, y, halfW, chartH, 'temperature-chart',   'Temperature',   'Safe: 10–40°C', C.temp);
+        y += chartH + chartGap;
+
+        // Row 2: Humidity + pH
+        chartCard(margin,          y, halfW, chartH, 'humidity-chart', 'Humidity',  'Safe: 20–90%',  C.humidity);
+        chartCard(margin + halfW + 3, y, halfW, chartH, 'ph-chart',      'pH Level',  'Safe: 5.0–8.0', C.ph);
+        y += chartH + chartGap;
+
+        // Row 3: Water Tank Level (full width)
+        chartCard(margin, y, contentW, chartH, 'water-level-chart', 'Water Tank Level', 'Safe: ≥ 10%', C.water);
+
+        // ── Footer on all pages ────────────────────────────────────
         const lastPage = doc.internal.getNumberOfPages();
         for (let p = 1; p <= lastPage; p++) {
             doc.setPage(p);
             doc.setFillColor(...C.darkBg);
-            doc.rect(0, pageH - 12, pageW, 12, 'F');
-
+            doc.rect(0, pageH - 11, pageW, 11, 'F');
             doc.setFillColor(...C.green);
-            doc.rect(0, pageH - 12, pageW, 1.2, 'F');
-
-            doc.setFontSize(7);
+            doc.rect(0, pageH - 11, pageW, 0.8, 'F');
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
             doc.setTextColor(...C.muted);
-            doc.text('AgroEzuran Admin Dashboard  ·  Confidential', margin, pageH - 4.5);
-            doc.text(`Page ${p} of ${lastPage}`, pageW - margin, pageH - 4.5, { align: 'right' });
+            doc.text('AgroEzuran Admin Dashboard  ·  Confidential', margin, pageH - 3.5);
+            doc.text(`Page ${p} of ${lastPage}`, pageW - margin, pageH - 3.5, { align: 'right' });
         }
 
-        // ── SAVE ──────────────────────────────────────────────────────
+        // ── Save ───────────────────────────────────────────────────
         const fileDateStr = now.toISOString().split('T')[0];
-        doc.save(`AgroEzuran-Admin-Report-${fileDateStr}.pdf`);
+        doc.save(`AgroEzuran-Report-${fileDateStr}.pdf`);
 
         btn.disabled = false;
         btn.innerHTML = originalHTML;
@@ -3628,7 +3936,7 @@ document.getElementById('export-report-btn')?.addEventListener('click', async ()
         btn.innerHTML = originalHTML;
         alert('Failed to generate PDF: ' + error.message);
     }
-});
+}
 
 // ─────────────────────────────────────────────────────────────
 // DEVICE INVENTORY
@@ -3829,6 +4137,23 @@ let currentSupportFilter = '';
 let currentSupportSearch = '';
 let _allSupportDocs = [];
 let _deviceCodeCache = {}; // deviceId (doc ID) → unique_code
+let _farmerPhotoCache = {}; // farmer_uid → photoURL | null
+
+async function _ensureFarmerPhotos(uids) {
+    const missing = [...new Set(uids)].filter(uid => uid && _farmerPhotoCache[uid] === undefined);
+    if (!missing.length) return;
+    for (let i = 0; i < missing.length; i += 10) {
+        const batch = missing.slice(i, i + 10);
+        try {
+            const snap = await db.collection('users').where('uid', 'in', batch).get();
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                _farmerPhotoCache[d.uid] = d.photoURL || null;
+            });
+        } catch (_) {}
+        batch.forEach(uid => { if (_farmerPhotoCache[uid] === undefined) _farmerPhotoCache[uid] = null; });
+    }
+}
 
 async function _ensureDeviceCodes(deviceIds) {
     const missing = [...new Set(deviceIds)].filter(id => id && _deviceCodeCache[id] === undefined);
@@ -3847,6 +4172,151 @@ async function _ensureDeviceCodes(deviceIds) {
         // Mark unfound ids so we don't re-query them
         batch.forEach(id => { if (_deviceCodeCache[id] === undefined) _deviceCodeCache[id] = null; });
     }
+}
+
+// ── Farmer avatar popover ─────────────────────────────────────────────────────
+
+let _fp_target = null;
+let _fp_timer  = null;
+
+function _initFarmerPopover() {
+    if (document.getElementById('farmer-popover')) return; // already exists
+
+    const pop = document.createElement('div');
+    pop.id = 'farmer-popover';
+    pop.style.cssText = [
+        'position:fixed',
+        'z-index:9999',
+        'pointer-events:none',
+        'opacity:0',
+        'transform:translateX(-6px)',
+        'transition:opacity 0.18s ease,transform 0.18s ease',
+        'width:230px',
+    ].join(';');
+    pop.innerHTML = `
+        <div style="background:#1c271f;border:1px solid #3b5443;border-radius:14px;padding:14px 16px;box-shadow:0 16px 48px rgba(0,0,0,0.55);pointer-events:auto;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                <div id="fp-photo" style="width:42px;height:42px;border-radius:50%;overflow:hidden;flex-shrink:0;background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.3);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px;"></div>
+                <div style="flex:1;min-width:0;">
+                    <p id="fp-name" style="color:#fff;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;"></p>
+                    <span id="fp-status" style="font-size:10px;padding:2px 8px;border-radius:999px;font-weight:600;"></span>
+                </div>
+            </div>
+            <div style="border-top:1px solid #3b5443;padding-top:8px;">
+                <p id="fp-email" style="color:#9db9a6;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:4px;display:flex;align-items:center;gap:4px;"></p>
+                <p id="fp-farm"  style="color:#9db9a6;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:flex;align-items:center;gap:4px;"></p>
+            </div>
+            <button id="fp-view-btn"
+                style="margin-top:10px;width:100%;padding:7px;background:rgba(43,238,108,0.1);border:1px solid rgba(43,238,108,0.3);border-radius:8px;color:#2bec6c;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:background 0.15s;"
+                onmouseover="this.style.background='rgba(43,238,108,0.2)'"
+                onmouseout="this.style.background='rgba(43,238,108,0.1)'"
+                onclick="goToFarmerProfile(this.dataset.uid)">
+                <span style="font-family:sans-serif;font-size:14px;line-height:1;">↗</span>View Profile
+            </button>
+        </div>`;
+    document.body.appendChild(pop);
+
+    // Hide when mouse leaves the popover itself
+    pop.addEventListener('mouseleave', () => {
+        clearTimeout(_fp_timer);
+        _fp_target = null;
+        _hideFarmerPopover();
+    });
+
+    // Event delegation on ticket list
+    const list = document.getElementById('ticket-list');
+    if (!list) return;
+
+    list.addEventListener('mouseover', e => {
+        const el = e.target.closest('[data-farmer-uid]');
+        if (!el) return;
+        if (el === _fp_target) return;
+        _fp_target = el;
+        clearTimeout(_fp_timer);
+        _fp_timer = setTimeout(() => _showFarmerPopover(el), 150);
+    });
+
+    list.addEventListener('mouseout', e => {
+        const to = e.relatedTarget;
+        if (pop.contains(to)) return;
+        if (to && to.closest('[data-farmer-uid]')) return;
+        clearTimeout(_fp_timer);
+        _fp_target = null;
+        _hideFarmerPopover();
+    });
+}
+
+function _hideFarmerPopover() {
+    const pop = document.getElementById('farmer-popover');
+    if (!pop) return;
+    pop.style.opacity = '0';
+    pop.style.transform = 'translateX(-6px)';
+}
+
+function _showFarmerPopover(avatarEl) {
+    const pop = document.getElementById('farmer-popover');
+    if (!pop) return;
+
+    const farmerUid = avatarEl.dataset.farmerUid;
+    const user = allUsers.find(u => u.uid === farmerUid);
+    if (!user) return;
+
+    // Photo / initials
+    const ini     = (user.name || user.displayName || 'U')[0].toUpperCase();
+    const photoEl = document.getElementById('fp-photo');
+    if (user.photoURL) {
+        photoEl.innerHTML = `<img src="${user.photoURL}" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentElement.textContent='${ini}'">`;
+    } else {
+        photoEl.textContent = ini;
+    }
+
+    document.getElementById('fp-name').textContent = user.name || user.displayName || 'Unknown';
+
+    const stColors = { active:'#22c55e', pending:'#eab308', inactive:'#ef4444' };
+    const stBg     = { active:'rgba(34,197,94,0.12)', pending:'rgba(234,179,8,0.12)', inactive:'rgba(239,68,68,0.12)' };
+    const st = user.status || 'active';
+    const statusEl = document.getElementById('fp-status');
+    statusEl.textContent = st[0].toUpperCase() + st.slice(1);
+    statusEl.style.color      = stColors[st] || stColors.active;
+    statusEl.style.background = stBg[st]     || stBg.active;
+
+    const emailEl = document.getElementById('fp-email');
+    emailEl.innerHTML = user.email
+        ? `<span style="font-family:sans-serif;">✉</span>${user.email}`
+        : '<span style="opacity:0.5">No email</span>';
+
+    const farmEl = document.getElementById('fp-farm');
+    farmEl.innerHTML = user.farm_name
+        ? `<span style="font-family:sans-serif;">🌱</span>${user.farm_name}`
+        : '<span style="opacity:0.5">No farm set</span>';
+
+    document.getElementById('fp-view-btn').dataset.uid = farmerUid;
+
+    // Position: right side of avatar, vertically centred
+    const rect  = avatarEl.getBoundingClientRect();
+    const popW  = 230;
+    const popH  = 185; // approximate rendered height
+    let   left  = rect.right + 12;
+    let   top   = rect.top + rect.height / 2 - popH / 2;
+
+    // Flip left if would overflow right viewport edge
+    if (left + popW > window.innerWidth - 8) left = rect.left - popW - 12;
+    // Clamp vertically
+    top = Math.max(8, Math.min(top, window.innerHeight - popH - 8));
+
+    pop.style.left      = `${left}px`;
+    pop.style.top       = `${top}px`;
+    pop.style.opacity   = '1';
+    pop.style.transform = 'translateX(0)';
+}
+
+function goToFarmerProfile(farmerUid) {
+    const user = allUsers.find(u => u.uid === farmerUid);
+    if (!user) { alert('Farmer profile not found'); return; }
+    _hideFarmerPopover();
+    navigateToPage('users');
+    // Brief delay for page to render, then open modal
+    setTimeout(() => viewUserDetails(user.id), 250);
 }
 
 async function loadSupportPage() {
@@ -3889,6 +4359,7 @@ async function loadSupportPage() {
     document.getElementById('resolve-btn').onclick = () => updateTicketStatus(currentTicketId, 'resolved');
     document.getElementById('reopen-btn').onclick = () => updateTicketStatus(currentTicketId, 'open');
 
+    _initFarmerPopover();
     loadTicketList();
 }
 
@@ -3908,8 +4379,11 @@ async function renderTicketList() {
     const list = document.getElementById('ticket-list');
     const docs = _allSupportDocs;
 
-    // Pre-fetch unique_code for all device IDs in one batch
-    await _ensureDeviceCodes(docs.map(d => d.data().device_id).filter(Boolean));
+    // Pre-fetch unique_code and farmer photos in parallel
+    await Promise.all([
+        _ensureDeviceCodes(docs.map(d => d.data().device_id).filter(Boolean)),
+        _ensureFarmerPhotos(docs.map(d => d.data().farmer_uid).filter(Boolean)),
+    ]);
 
     // --- Stats counts ---
     const cOpen     = docs.filter(d => d.data().status === 'open').length;
@@ -3929,9 +4403,10 @@ async function renderTicketList() {
     if (navLabel) navLabel.textContent = cNavOpen > 0 ? `Support (${cNavOpen})` : 'Support';
 
     // --- Filter + search ---
+    // "All" tab hides resolved — they live in the "Done" tab only
     let filtered = currentSupportFilter
         ? docs.filter(d => d.data().status === currentSupportFilter)
-        : docs;
+        : docs.filter(d => d.data().status !== 'resolved');
 
     if (currentSupportSearch) {
         filtered = filtered.filter(d => {
@@ -3944,7 +4419,7 @@ async function renderTicketList() {
 
     if (filtered.length === 0) {
         list.innerHTML = `<div class="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center">
-            <span class="material-icons text-3xl text-[#3b5443]">inbox</span>
+            <span class="material-symbols-outlined text-3xl text-[#3b5443]">inbox</span>
             <p class="text-[#9db9a6] text-sm">${currentSupportSearch ? 'No matching tickets' : 'No tickets here'}</p>
         </div>`;
         return;
@@ -3980,6 +4455,20 @@ async function renderTicketList() {
         const updAt    = t.updated_at ? (t.updated_at.toDate ? t.updated_at.toDate() : new Date(t.updated_at)) : null;
         const ago      = timeAgo(updAt);
         const avatar   = initials(t.farmer_name);
+        const photoURL = _farmerPhotoCache[t.farmer_uid];
+        const safeUid  = (t.farmer_uid || '').replace(/'/g, "\\'");
+        const innerAvatar = photoURL
+            ? `<img src="${photoURL}" alt="${avatar}" class="w-9 h-9 rounded-full object-cover" style="border:1.5px solid rgba(43,238,108,0.25);display:block;" onerror="this.replaceWith((()=>{const d=document.createElement('div');d.className='w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white';d.style='background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.25)';d.textContent='${avatar}';return d})())">`
+            : `<div class="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white" style="background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.25)">${avatar}</div>`;
+        const avatarHtml = `<div class="flex-shrink-0 relative group/av" data-farmer-uid="${t.farmer_uid || ''}"
+            style="cursor:pointer"
+            title="View farmer profile"
+            onclick="event.stopPropagation();goToFarmerProfile('${safeUid}')">
+            ${innerAvatar}
+            <div class="absolute inset-0 rounded-full opacity-0 group-hover/av:opacity-100 transition-opacity flex items-center justify-center" style="background:rgba(43,238,108,0.25);">
+                <span style="font-size:12px;line-height:1;color:#fff;">↗</span>
+            </div>
+        </div>`;
         const unreadBadge = t.unread_admin > 0
             ? `<span class="flex-shrink-0 min-w-[20px] h-5 px-1 bg-primary rounded-full text-[#111813] text-[10px] font-bold flex items-center justify-center animate-pulse">${t.unread_admin}</span>`
             : '';
@@ -3987,8 +4476,7 @@ async function renderTicketList() {
         return `<div class="ticket-item relative flex items-start gap-3 px-4 py-3 cursor-pointer border-l-4 ${border}
                     hover:bg-[#1a2a1f] transition-colors ${isActive ? 'bg-[#1e2f23]' : ''}"
                     onclick="openTicket('${doc.id}')">
-            <div class="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                 style="background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.25)">${avatar}</div>
+            ${avatarHtml}
             <div class="flex-1 min-w-0">
                 <div class="flex items-center justify-between gap-1">
                     <p class="text-white text-sm font-semibold truncate flex-1">${t.subject || 'No subject'}</p>
@@ -4026,12 +4514,27 @@ async function openTicket(ticketId) {
     document.getElementById('chat-subject').textContent = ticket.subject || 'Support Ticket';
     document.getElementById('chat-meta').textContent = `${ticket.farmer_name || 'Farmer'} · Device: ${ticket.device_id || '—'} · ${ticket.device_code || ''}`;
 
-    // Populate farmer avatar initials
+    // Populate farmer avatar — photo if available, else initials
     const avatarEl = document.getElementById('chat-avatar');
     if (avatarEl) {
         const name = ticket.farmer_name || '';
-        const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
-        avatarEl.textContent = initials;
+        const ini = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
+        await _ensureFarmerPhotos([ticket.farmer_uid].filter(Boolean));
+        const photoURL = _farmerPhotoCache[ticket.farmer_uid];
+        if (photoURL) {
+            avatarEl.innerHTML = '';
+            avatarEl.style.padding = '0';
+            avatarEl.style.overflow = 'hidden';
+            const img = document.createElement('img');
+            img.src = photoURL;
+            img.alt = ini;
+            img.className = 'w-full h-full object-cover';
+            img.onerror = () => { avatarEl.innerHTML = ''; avatarEl.textContent = ini; };
+            avatarEl.appendChild(img);
+        } else {
+            avatarEl.innerHTML = '';
+            avatarEl.textContent = ini;
+        }
     }
 
     updateChatStatusUI(ticket.status);
@@ -4086,6 +4589,44 @@ function renderMessages(docs) {
 
     container.innerHTML = docs.map((doc, i) => {
         const m = doc.data();
+
+        // ── Device info attachment card ──
+        if (m.type === 'device_info') {
+            const code     = m.unique_code || m.device_id || '—';
+            const cropName = m.crop_name   || '';
+            const imageUrl = m.image_url   || '';
+            const imgHtml  = imageUrl
+                ? `<img src="${imageUrl}" alt="crop"
+                        class="w-16 h-16 rounded-xl object-cover flex-shrink-0"
+                        style="border:1px solid rgba(43,238,108,0.2)"
+                        onerror="this.outerHTML='<div class=\\'w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0\\'style=\\'background:rgba(43,238,108,0.08);border:1px solid rgba(43,238,108,0.2)\\'><span class=\\'material-symbols-outlined text-primary\\'style=\\'font-size:26px\\'>eco</span></div>'">`
+                : `<div class="w-16 h-16 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style="background:rgba(43,238,108,0.08);border:1px solid rgba(43,238,108,0.2)">
+                       <span class="material-symbols-outlined text-primary" style="font-size:26px">eco</span>
+                   </div>`;
+            return `<div class="flex justify-start mb-3">
+                <div class="max-w-xs bg-[#131f16] border border-[#3b5443] rounded-2xl overflow-hidden">
+                    <div class="flex items-center gap-2 px-4 py-2.5 bg-primary/10 border-b border-[#3b5443]">
+                        <span class="material-symbols-outlined text-primary" style="font-size:15px">memory</span>
+                        <span class="text-primary text-xs font-bold">Device Details</span>
+                    </div>
+                    <div class="flex items-center gap-3 px-3 py-3">
+                        ${imgHtml}
+                        <div class="space-y-1.5">
+                            <div class="flex gap-2">
+                                <span class="text-[#9db9a6] text-xs w-12 flex-shrink-0">Device</span>
+                                <span class="text-white text-xs font-semibold">${escapeHtml(code)}</span>
+                            </div>
+                            ${cropName ? `<div class="flex gap-2">
+                                <span class="text-[#9db9a6] text-xs w-12 flex-shrink-0">Crop</span>
+                                <span class="text-white text-xs font-semibold">${escapeHtml(cropName)}</span>
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+
         const isAdmin = m.sender_role === 'admin';
         const isFarmer = m.sender_role === 'farmer';
         const time = m.sent_at ? (m.sent_at.toDate ? m.sent_at.toDate() : new Date(m.sent_at)).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }) : '';

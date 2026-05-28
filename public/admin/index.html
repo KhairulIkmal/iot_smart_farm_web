@@ -70,6 +70,310 @@
         .dark ::-webkit-scrollbar-thumb:hover {
             background: #4a6654;
         }
+
+        /* ═══════════════════════════════════════════════════════
+           ADMIN PANEL — ATMOSPHERIC DARK-GREEN MAKEOVER
+           Matches the login page's premium aesthetic throughout
+        ═══════════════════════════════════════════════════════ */
+
+        /* ── Animations ─────────────────────────────────────── */
+        @keyframes db-blob {
+            0%,100% { transform:scale(1);    opacity:1; }
+            33%     { transform:scale(1.12) translate(20px,-15px); opacity:0.7; }
+            66%     { transform:scale(0.91) translate(-15px,12px); opacity:0.85; }
+        }
+        @keyframes db-float {
+            0%,100% { transform:translateY(0px); }
+            50%     { transform:translateY(-13px); }
+        }
+        @keyframes db-fadein {
+            from { opacity:0; transform:translateY(8px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        @keyframes db-shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position:  200% center; }
+        }
+
+        /* ── Sidebar ─────────────────────────────────────────── */
+        #dashboard-screen > aside {
+            background: linear-gradient(180deg,#080f0a 0%,#0d1610 55%,#091209 100%) !important;
+            border-right: 1px solid rgba(43,238,108,0.14) !important;
+            box-shadow: 4px 0 40px rgba(0,0,0,0.65), inset -1px 0 0 rgba(43,238,108,0.07);
+        }
+        /* Brand logo glow */
+        #dashboard-screen aside .w-10.h-10 {
+            box-shadow: 0 0 18px rgba(43,238,108,0.18);
+        }
+        /* Active nav item */
+        .nav-item.bg-\[\#28392e\] {
+            background: linear-gradient(90deg, rgba(43,238,108,0.22) 0%, rgba(43,238,108,0.06) 100%) !important;
+            border-left: 3px solid #2bee6c !important;
+            padding-left: calc(0.75rem - 3px) !important;
+            box-shadow: inset 0 0 20px rgba(43,238,108,0.06);
+        }
+        /* Nav icon color for active */
+        .nav-item.bg-\[\#28392e\] .material-symbols-outlined {
+            color: #2bee6c !important;
+        }
+        /* Nav hover */
+        .nav-item:not(.bg-\[\#28392e\]):hover {
+            background: rgba(28,42,32,0.65) !important;
+        }
+        /* Back / Sign Out buttons in sidebar */
+        #dashboard-screen aside .border.border-\[\#3b5443\] {
+            border-color: rgba(59,84,67,0.5) !important;
+            background: rgba(12,20,14,0.7) !important;
+            transition: all 0.2s;
+        }
+        #dashboard-screen aside .border.border-\[\#3b5443\]:hover {
+            border-color: rgba(43,238,108,0.3) !important;
+            background: rgba(28,42,32,0.8) !important;
+        }
+
+        /* ── Mobile topbar & drawer ──────────────────────────── */
+        #mobile-topbar {
+            background: rgba(8,15,10,0.95) !important;
+            backdrop-filter: blur(20px);
+            border-bottom-color: rgba(43,238,108,0.12) !important;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+        }
+        #mobile-drawer {
+            background: linear-gradient(180deg,#080f0a 0%,#0d1610 100%) !important;
+            border-right-color: rgba(43,238,108,0.12) !important;
+            box-shadow: 8px 0 32px rgba(0,0,0,0.6);
+        }
+
+        /* ── Main content background ─────────────────────────── */
+        #dashboard-screen > main {
+            background: #0a1a0e !important;
+        }
+        .layout-container {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ── Page title gradient text ────────────────────────── */
+        #page-title {
+            background: linear-gradient(95deg, #ffffff 0%, #c8f5d8 60%, #2bee6c 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 16px rgba(43,238,108,0.1));
+        }
+
+        /* ── Stats cards — colored left-border accent ────────── */
+        div:has(> div > #stat-devices-total)  { border-left: 3px solid rgba(43,238,108,0.7) !important; }
+        div:has(> div > #stat-devices-unclaimed) { border-left: 3px solid rgba(250,204,21,0.7)  !important; }
+        div:has(> div > #stat-active-farmers) { border-left: 3px solid rgba(96,165,250,0.7)   !important; }
+        div:has(> div > #stat-open-tickets)   { border-left: 3px solid rgba(251,146,60,0.7)   !important; }
+
+        /* ── Cards ───────────────────────────────────────────── */
+        .bg-\[\#1c271f\] {
+            background: rgba(14,24,16,0.92) !important;
+            backdrop-filter: blur(6px);
+            transition: border-color 0.25s ease, box-shadow 0.25s ease !important;
+        }
+        .rounded-xl.bg-\[\#1c271f\]:hover,
+        section > .bg-\[\#1c271f\]:hover {
+            border-color: rgba(43,238,108,0.28) !important;
+            box-shadow: 0 0 32px rgba(43,238,108,0.09), 0 4px 20px rgba(0,0,0,0.35) !important;
+        }
+        /* Table header */
+        .bg-\[\#161f19\] {
+            background: rgba(9,17,11,0.9) !important;
+        }
+        /* Inner surfaces */
+        .bg-\[\#28392e\] {
+            background: rgba(26,42,30,0.85) !important;
+        }
+        /* Deep inputs */
+        .bg-\[\#111813\] {
+            background: rgba(6,13,8,0.9) !important;
+        }
+        /* Darker modal bg */
+        .bg-\[\#131f16\] {
+            background: rgba(10,18,12,0.97) !important;
+        }
+
+        /* ── Table row hover ─────────────────────────────────── */
+        tbody tr {
+            transition: background 0.15s ease;
+        }
+        tbody tr:hover td {
+            background: rgba(43,238,108,0.04) !important;
+        }
+
+        /* ── Primary action buttons — gradient ───────────────── */
+        #header-generate-btn,
+        #generate-code-btn,
+        #confirm-generate-btn,
+        #export-report-btn,
+        #send-notif-btn,
+        #edit-admin-profile-btn,
+        #send-reply-btn {
+            background: linear-gradient(135deg, #2bec6c 0%, #18c450 100%) !important;
+            color: #071a0c !important;
+            box-shadow: 0 4px 20px rgba(43,238,108,0.28) !important;
+            transition: all 0.2s ease !important;
+        }
+        #header-generate-btn:hover,
+        #generate-code-btn:hover,
+        #confirm-generate-btn:hover,
+        #export-report-btn:hover,
+        #send-notif-btn:hover,
+        #edit-admin-profile-btn:hover,
+        #send-reply-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 32px rgba(43,238,108,0.44) !important;
+        }
+        /* Refresh button */
+        #refresh-btn {
+            border: 1px solid rgba(43,238,108,0.2);
+            transition: all 0.2s ease;
+        }
+        #refresh-btn:hover {
+            border-color: rgba(43,238,108,0.4);
+            box-shadow: 0 0 16px rgba(43,238,108,0.12);
+        }
+
+        /* ── Quick-action tiles ──────────────────────────────── */
+        .grid-cols-2 button.flex.flex-col.items-center {
+            transition: all 0.2s ease;
+            border-color: rgba(59,84,67,0.4) !important;
+        }
+        .grid-cols-2 button.flex.flex-col.items-center:hover {
+            border-color: rgba(43,238,108,0.28) !important;
+            box-shadow: 0 0 20px rgba(43,238,108,0.07);
+            transform: translateY(-2px);
+        }
+
+        /* ── Support tabs ────────────────────────────────────── */
+        .support-tab.bg-\[\#28392e\] {
+            background: rgba(43,238,108,0.15) !important;
+            color: #2bee6c !important;
+        }
+
+        /* ── Chat panel header ───────────────────────────────── */
+        #chat-active > div:first-child {
+            background: linear-gradient(135deg, #090f0a 0%, #0d1810 100%) !important;
+        }
+        /* Chat input area */
+        #chat-input-area .flex.gap-3 {
+            background: rgba(6,13,8,0.9) !important;
+            border-color: rgba(59,84,67,0.5) !important;
+        }
+        #chat-input-area .flex.gap-3:focus-within {
+            border-color: rgba(43,238,108,0.45) !important;
+            box-shadow: 0 0 0 3px rgba(43,238,108,0.08);
+        }
+
+        /* ── Modals — glassmorphism ───────────────────────────── */
+        /* .bg-[#131f16] handles modal dialog containers (already done above) */
+        /* Modal overlay backdrop enhancement */
+        #user-details-modal,
+        #report-preview-modal,
+        #generate-code-modal,
+        #farm-details-modal {
+            background: rgba(0,0,0,0.78) !important;
+        }
+        /* Extra glow on modal containers */
+        #user-details-modal > div,
+        #report-preview-modal > div,
+        #generate-code-modal > div,
+        #farm-details-modal > div {
+            box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(43,238,108,0.08), 0 0 60px rgba(43,238,108,0.04) !important;
+        }
+        /* Modal hero header */
+        #user-details-modal .p-6.pb-5 {
+            background: linear-gradient(135deg, rgba(43,238,108,0.12) 0%, rgba(43,238,108,0.03) 100%) !important;
+        }
+
+        /* ── Generated code display ──────────────────────────── */
+        #generated-code-display {
+            background: rgba(4,12,6,0.9) !important;
+            border-color: rgba(43,238,108,0.35) !important;
+            box-shadow: 0 0 32px rgba(43,238,108,0.1) inset;
+        }
+        #generated-code-value {
+            text-shadow: 0 0 20px rgba(43,238,108,0.5);
+        }
+
+        /* ── Analytics chart cards ───────────────────────────── */
+        #page-analytics .bg-\[\#1c271f\].rounded-xl {
+            transition: all 0.25s ease;
+        }
+
+        /* ── Notification templates ──────────────────────────── */
+        #template-maintenance, #template-downtime, #template-update {
+            transition: all 0.2s ease;
+        }
+        #template-maintenance:hover, #template-downtime:hover, #template-update:hover {
+            border-color: rgba(43,238,108,0.25) !important;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        }
+
+        /* ── Footer ──────────────────────────────────────────── */
+        footer {
+            border-top: 1px solid rgba(43,238,108,0.07);
+            padding-top: 14px;
+        }
+
+        /* ── Farmer cards (Farmers page) ─────────────────────── */
+        #farmers-grid > div {
+            transition: all 0.25s ease !important;
+        }
+        #farmers-grid > div:hover {
+            border-color: rgba(43,238,108,0.3) !important;
+            box-shadow: 0 0 28px rgba(43,238,108,0.1), 0 4px 16px rgba(0,0,0,0.4) !important;
+            transform: translateY(-2px);
+        }
+
+        /* ── Status badges ───────────────────────────────────── */
+        /* Give active badge a subtle glow */
+        .bg-primary\/15.text-primary,
+        .bg-primary\/10.text-primary {
+            box-shadow: 0 0 12px rgba(43,238,108,0.12);
+        }
+
+        /* ── Device Inventory stat mini cards ────────────────── */
+        #page-devices .grid > div {
+            transition: all 0.2s ease;
+        }
+        #page-devices .grid > div:hover {
+            border-color: rgba(43,238,108,0.25) !important;
+            box-shadow: 0 0 20px rgba(43,238,108,0.07);
+        }
+
+        /* ── Support ticket items ────────────────────────────── */
+        #ticket-list > div.cursor-pointer {
+            transition: background 0.15s ease;
+        }
+        #ticket-list > div.cursor-pointer:hover {
+            background: rgba(43,238,108,0.04) !important;
+        }
+
+        /* ── Settings page cards ─────────────────────────────── */
+        #page-settings .bg-\[\#28392e\].rounded-lg {
+            transition: all 0.2s ease;
+        }
+        #page-settings button.w-full:hover {
+            border-color: rgba(43,238,108,0.22) !important;
+        }
+
+        /* ── Section heading typography ──────────────────────── */
+        .text-white.text-lg.font-bold,
+        .text-white.text-xl.font-bold {
+            letter-spacing: -0.01em;
+        }
+
+        /* ── Time range buttons in analytics ─────────────────── */
+        #time-7d.bg-primary {
+            background: linear-gradient(135deg,#2bec6c,#18c450) !important;
+            color: #071a0c !important;
+            box-shadow: 0 2px 10px rgba(43,238,108,0.3) !important;
+        }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-hidden antialiased">
@@ -147,61 +451,204 @@
 </div>
 
 <!-- Login Screen -->
-<div id="login-screen" class="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-[#102216] to-[#1c271f] p-6">
-    <div class="w-full max-w-md bg-[#1c271f] border border-[#28392e] rounded-xl shadow-2xl p-8">
-        <div class="text-center mb-8">
-            <div class="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-full mb-4">
-                <span class="material-symbols-outlined text-[#111813] text-3xl">agriculture</span>
+<div id="login-screen" class="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden" style="background:#0a1a0e;">
+
+    <!-- Animated background blobs -->
+    <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
+        <!-- Large green glow top-left -->
+        <div style="position:absolute;top:-15%;left:-10%;width:55vw;height:55vw;border-radius:50%;background:radial-gradient(circle,rgba(43,238,108,0.13) 0%,transparent 70%);animation:lp-pulse 8s ease-in-out infinite;"></div>
+        <!-- Smaller glow bottom-right -->
+        <div style="position:absolute;bottom:-10%;right:-8%;width:40vw;height:40vw;border-radius:50%;background:radial-gradient(circle,rgba(43,238,108,0.09) 0%,transparent 70%);animation:lp-pulse 10s ease-in-out infinite reverse;"></div>
+        <!-- Mid accent -->
+        <div style="position:absolute;top:45%;left:55%;width:20vw;height:20vw;border-radius:50%;background:radial-gradient(circle,rgba(43,238,108,0.07) 0%,transparent 70%);animation:lp-pulse 6s ease-in-out infinite 2s;"></div>
+
+        <!-- Grid lines overlay -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.06;" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <pattern id="lp-grid" width="48" height="48" patternUnits="userSpaceOnUse">
+                    <path d="M 48 0 L 0 0 0 48" fill="none" stroke="#2bec6c" stroke-width="0.5"/>
+                </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#lp-grid)"/>
+        </svg>
+
+        <!-- Floating leaf/dot particles -->
+        <div style="position:absolute;top:12%;left:18%;width:6px;height:6px;border-radius:50%;background:#2bec6c;opacity:0.35;animation:lp-float 7s ease-in-out infinite;"></div>
+        <div style="position:absolute;top:68%;left:12%;width:4px;height:4px;border-radius:50%;background:#2bec6c;opacity:0.25;animation:lp-float 9s ease-in-out infinite 1.5s;"></div>
+        <div style="position:absolute;top:30%;right:14%;width:5px;height:5px;border-radius:50%;background:#2bec6c;opacity:0.3;animation:lp-float 8s ease-in-out infinite 3s;"></div>
+        <div style="position:absolute;top:80%;right:22%;width:4px;height:4px;border-radius:50%;background:#2bec6c;opacity:0.2;animation:lp-float 11s ease-in-out infinite 0.5s;"></div>
+        <div style="position:absolute;top:50%;left:40%;width:3px;height:3px;border-radius:50%;background:#2bec6c;opacity:0.2;animation:lp-float 6s ease-in-out infinite 4s;"></div>
+    </div>
+
+    <style>
+        @keyframes lp-pulse {
+            0%,100% { transform:scale(1); opacity:1; }
+            50%      { transform:scale(1.12); opacity:0.7; }
+        }
+        @keyframes lp-float {
+            0%,100% { transform:translateY(0px); }
+            50%      { transform:translateY(-18px); }
+        }
+        @keyframes lp-slidein {
+            from { opacity:0; transform:translateY(24px); }
+            to   { opacity:1; transform:translateY(0); }
+        }
+        #login-screen input:-webkit-autofill {
+            -webkit-box-shadow: 0 0 0 30px #111813 inset !important;
+            -webkit-text-fill-color: #fff !important;
+        }
+    </style>
+
+    <!-- Left side — branding (hidden on mobile) -->
+    <div class="hidden lg:flex flex-col justify-center flex-1 max-w-lg pr-16" style="animation:lp-slidein 0.6s ease both;">
+        <div class="flex items-center gap-3 mb-10">
+            <div style="width:44px;height:44px;border-radius:12px;background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.3);display:flex;align-items:center;justify-content:center;">
+                <span class="material-symbols-outlined" style="color:#2bec6c;font-size:22px;">agriculture</span>
             </div>
-            <h1 class="text-white text-3xl font-black mb-2">AgroEzuran Admin</h1>
-            <p class="text-[#9db9a6] text-sm">Sign in to access the admin dashboard</p>
+            <span style="color:#2bec6c;font-size:18px;font-weight:800;letter-spacing:-0.3px;">AgroEzuran</span>
         </div>
-        <form id="login-form" class="space-y-5">
-            <div>
-                <label class="text-sm font-medium text-[#9db9a6] mb-2 block">Email Address</label>
-                <input type="email" id="admin-email" placeholder="admin@smartfarm.com" required
-                    class="w-full bg-[#111813] border border-[#3b5443] text-white rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all">
-            </div>
-            <div>
-                <label class="text-sm font-medium text-[#9db9a6] mb-2 block">Password</label>
-                <input type="password" id="admin-password" placeholder="Enter your password" required
-                    class="w-full bg-[#111813] border border-[#3b5443] text-white rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-primary focus:border-primary transition-all">
-            </div>
-            <button type="submit" id="login-btn"
-                class="w-full bg-primary hover:bg-[#25d360] text-[#111813] font-bold rounded-lg py-3 transition-all flex items-center justify-center gap-2">
-                <span id="login-text">Sign In</span>
-                <span id="login-spinner" class="hidden">
-                    <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+
+        <h2 style="color:#fff;font-size:clamp(2rem,4vw,3rem);font-weight:900;line-height:1.1;margin-bottom:20px;">
+            Smart Farm<br><span style="color:#2bec6c;">Admin Panel</span>
+        </h2>
+        <p style="color:#9db9a6;font-size:15px;line-height:1.7;max-width:380px;margin-bottom:40px;">
+            Monitor device inventory, manage farmer accounts, track sensor data, and keep your smart farm ecosystem running smoothly.
+        </p>
+
+        <!-- Feature pills -->
+        <div style="display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="width:28px;height:28px;border-radius:8px;background:rgba(43,238,108,0.1);border:1px solid rgba(43,238,108,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span class="material-symbols-outlined" style="color:#2bec6c;font-size:15px;">memory</span>
                 </span>
-            </button>
-            <div id="login-error" class="hidden bg-red-500/10 border border-red-500/50 text-red-500 rounded-lg p-3 text-sm"></div>
-        </form>
-        <div class="mt-6 pt-5 border-t border-[#28392e] text-center">
-            <a href="../login" class="inline-flex items-center gap-1.5 text-[#9db9a6] hover:text-white text-sm transition-colors">
-                <span class="material-symbols-outlined text-[16px]">arrow_back</span>
-                Back to Main App
-            </a>
+                <span style="color:#9db9a6;font-size:13px;">Real-time device monitoring & inventory</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="width:28px;height:28px;border-radius:8px;background:rgba(43,238,108,0.1);border:1px solid rgba(43,238,108,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span class="material-symbols-outlined" style="color:#2bec6c;font-size:15px;">groups</span>
+                </span>
+                <span style="color:#9db9a6;font-size:13px;">Farmer account management</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span style="width:28px;height:28px;border-radius:8px;background:rgba(43,238,108,0.1);border:1px solid rgba(43,238,108,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <span class="material-symbols-outlined" style="color:#2bec6c;font-size:15px;">analytics</span>
+                </span>
+                <span style="color:#9db9a6;font-size:13px;">Analytics & sensor trend reports</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right side — login card -->
+    <div class="w-full max-w-sm relative" style="animation:lp-slidein 0.7s ease 0.1s both;">
+        <!-- Glow behind card -->
+        <div style="position:absolute;inset:-1px;border-radius:22px;background:linear-gradient(135deg,rgba(43,238,108,0.25),transparent 60%);z-index:0;filter:blur(1px);"></div>
+
+        <div style="position:relative;z-index:1;background:rgba(28,39,31,0.85);backdrop-filter:blur(20px);border:1px solid rgba(59,84,67,0.8);border-radius:22px;padding:36px 32px;box-shadow:0 32px 80px rgba(0,0,0,0.5);">
+
+            <!-- Logo -->
+            <div class="flex flex-col items-center mb-8">
+                <div style="width:60px;height:60px;border-radius:16px;background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.35);display:flex;align-items:center;justify-content:center;margin-bottom:14px;box-shadow:0 0 24px rgba(43,238,108,0.15);">
+                    <span class="material-symbols-outlined" style="color:#2bec6c;font-size:28px;">shield_person</span>
+                </div>
+                <h1 style="color:#fff;font-size:20px;font-weight:800;margin-bottom:4px;">Admin Access</h1>
+                <p style="color:#9db9a6;font-size:12.5px;">Restricted to authorised personnel only</p>
+            </div>
+
+            <form id="login-form" class="space-y-4">
+                <!-- Email -->
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:#9db9a6;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Email</label>
+                    <div style="position:relative;">
+                        <span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9db9a6;font-size:17px;pointer-events:none;">mail</span>
+                        <input type="email" id="admin-email" placeholder="admin@agroezuran.com" required
+                            style="width:100%;background:#0f1c12;border:1px solid #3b5443;color:#fff;border-radius:10px;padding:11px 14px 11px 38px;font-size:13.5px;outline:none;transition:border 0.2s,box-shadow 0.2s;box-sizing:border-box;"
+                            onfocus="this.style.borderColor='#2bec6c';this.style.boxShadow='0 0 0 3px rgba(43,238,108,0.12)'"
+                            onblur="this.style.borderColor='#3b5443';this.style.boxShadow='none'">
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div>
+                    <label style="font-size:12px;font-weight:600;color:#9db9a6;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.05em;">Password</label>
+                    <div style="position:relative;">
+                        <span class="material-symbols-outlined" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#9db9a6;font-size:17px;pointer-events:none;">lock</span>
+                        <input type="password" id="admin-password" placeholder="••••••••••" required
+                            style="width:100%;background:#0f1c12;border:1px solid #3b5443;color:#fff;border-radius:10px;padding:11px 14px 11px 38px;font-size:13.5px;outline:none;transition:border 0.2s,box-shadow 0.2s;box-sizing:border-box;"
+                            onfocus="this.style.borderColor='#2bec6c';this.style.boxShadow='0 0 0 3px rgba(43,238,108,0.12)'"
+                            onblur="this.style.borderColor='#3b5443';this.style.boxShadow='none'">
+                    </div>
+                </div>
+
+                <!-- Submit -->
+                <button type="submit" id="login-btn"
+                    style="width:100%;background:linear-gradient(135deg,#2bec6c,#1ec45a);color:#0a1a0e;font-weight:800;font-size:14px;border:none;border-radius:10px;padding:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s;box-shadow:0 4px 20px rgba(43,238,108,0.25);margin-top:8px;"
+                    onmouseover="this.style.boxShadow='0 6px 28px rgba(43,238,108,0.4)';this.style.transform='translateY(-1px)'"
+                    onmouseout="this.style.boxShadow='0 4px 20px rgba(43,238,108,0.25)';this.style.transform='translateY(0)'">
+                    <span id="login-text">Sign In to Dashboard</span>
+                    <span id="login-spinner" class="hidden">
+                        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </span>
+                </button>
+
+                <div id="login-error" class="hidden text-red-400 text-xs text-center rounded-lg p-3" style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);"></div>
+            </form>
+
+            <!-- Footer -->
+            <div style="margin-top:22px;padding-top:18px;border-top:1px solid rgba(59,84,67,0.5);display:flex;align-items:center;justify-content:center;">
+                <a href="../login" style="display:inline-flex;align-items:center;gap:5px;color:#9db9a6;font-size:12.5px;text-decoration:none;transition:color 0.2s;"
+                    onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#9db9a6'">
+                    <span class="material-symbols-outlined" style="font-size:15px;">arrow_back</span>
+                    Back to Main App
+                </a>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Main Dashboard -->
 <div id="dashboard-screen" class="hidden flex h-screen w-full overflow-hidden">
+
+    <!-- Ambient background layer (fixed, behind all dashboard content) -->
+    <div id="dash-bg-layer" style="position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0;">
+        <!-- Subtle grid -->
+        <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.028;" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <pattern id="db-grid" width="56" height="56" patternUnits="userSpaceOnUse">
+                    <path d="M 56 0 L 0 0 0 56" fill="none" stroke="#2bec6c" stroke-width="0.6"/>
+                </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#db-grid)"/>
+        </svg>
+        <!-- Ambient blobs -->
+        <div style="position:absolute;top:-20%;right:-8%;width:52vw;height:52vw;border-radius:50%;background:radial-gradient(circle,rgba(43,238,108,0.065) 0%,transparent 70%);animation:db-blob 14s ease-in-out infinite;"></div>
+        <div style="position:absolute;bottom:-18%;left:-6%;width:38vw;height:38vw;border-radius:50%;background:radial-gradient(circle,rgba(43,238,108,0.045) 0%,transparent 70%);animation:db-blob 18s ease-in-out infinite reverse;"></div>
+        <div style="position:absolute;top:38%;left:28%;width:22vw;height:22vw;border-radius:50%;background:radial-gradient(circle,rgba(43,238,108,0.03) 0%,transparent 70%);animation:db-blob 11s ease-in-out infinite 5s;"></div>
+        <!-- Floating dots -->
+        <div style="position:absolute;top:15%;right:20%;width:5px;height:5px;border-radius:50%;background:#2bec6c;opacity:0.25;animation:db-float 8s ease-in-out infinite;"></div>
+        <div style="position:absolute;top:60%;right:35%;width:3px;height:3px;border-radius:50%;background:#2bec6c;opacity:0.18;animation:db-float 11s ease-in-out infinite 2s;"></div>
+        <div style="position:absolute;top:75%;left:15%;width:4px;height:4px;border-radius:50%;background:#2bec6c;opacity:0.2;animation:db-float 9s ease-in-out infinite 4s;"></div>
+        <div style="position:absolute;top:25%;left:60%;width:3px;height:3px;border-radius:50%;background:#2bec6c;opacity:0.15;animation:db-float 13s ease-in-out infinite 1s;"></div>
+    </div>
+
     <!-- Sidebar -->
     <aside class="hidden lg:flex w-64 flex-col border-r border-[#28392e] bg-[#111813] p-4 flex-shrink-0">
         <div class="flex flex-col h-full justify-between">
             <div class="flex flex-col gap-8">
                 <!-- Profile / Brand -->
                 <div class="flex gap-3 items-center px-2">
-                    <div class="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 flex-shrink-0">
-                    <span class="material-symbols-outlined text-primary text-[22px]">agriculture</span>
-                </div>
+                    <div class="relative flex-shrink-0">
+                        <!-- Glow ring behind logo -->
+                        <div style="position:absolute;inset:-3px;border-radius:14px;background:linear-gradient(135deg,rgba(43,238,108,0.35),transparent 60%);z-index:0;filter:blur(2px);"></div>
+                        <div class="relative z-10 w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/25" style="box-shadow:0 0 18px rgba(43,238,108,0.18);">
+                            <span class="material-symbols-outlined text-primary text-[22px]">agriculture</span>
+                        </div>
+                    </div>
                     <div class="flex flex-col">
-                        <h1 class="text-white text-base font-bold leading-normal">AgroEzuran</h1>
-                        <p class="text-[#9db9a6] text-xs font-normal">Admin Panel</p>
+                        <h1 class="text-white text-base font-bold leading-normal tracking-tight">AgroEzuran</h1>
+                        <p class="text-[10px] font-semibold uppercase tracking-widest" style="color:#2bee6c;opacity:0.75;">Admin Panel</p>
                     </div>
                 </div>
                 <!-- Navigation -->
@@ -254,9 +701,11 @@
         <div class="layout-container flex flex-col max-w-[1400px] mx-auto p-6 pt-20 lg:pt-10 lg:p-10 gap-8">
             <!-- Page Heading -->
             <header class="flex flex-wrap justify-between items-end gap-4">
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-1.5">
+                    <!-- Green accent bar -->
+                    <div style="width:32px;height:3px;border-radius:2px;background:linear-gradient(90deg,#2bec6c,#18c450);box-shadow:0 0 10px rgba(43,238,108,0.4);margin-bottom:2px;"></div>
                     <h1 id="page-title" class="text-white text-3xl lg:text-4xl font-black tracking-tight">Dashboard Overview</h1>
-                    <p class="text-[#9db9a6] text-base">Welcome back, <span id="admin-name-text">Administrator</span>. Manage your device inventory and farmer support.</p>
+                    <p class="text-[#9db9a6] text-sm">Welcome back, <span id="admin-name-text" class="text-white font-medium">Administrator</span>. Manage your device inventory and farmer support.</p>
                 </div>
                 <div class="flex gap-3">
                     <button id="refresh-btn" class="flex items-center gap-2 px-4 py-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-sm font-medium transition-colors">
@@ -272,36 +721,52 @@
 
             <!-- Stats Cards -->
             <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                <div class="flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm hover:border-primary/30 hover:shadow-[0_0_20px_rgba(43,238,108,0.07)] transition-all duration-300">
+                <!-- Devices Sold -->
+                <div class="relative flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm overflow-hidden transition-all duration-300 hover:border-primary/30 hover:shadow-[0_0_24px_rgba(43,238,108,0.1)]">
+                    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(43,238,108,0.8),rgba(43,238,108,0.2));"></div>
                     <div class="flex items-center justify-between">
-                        <p class="text-[#9db9a6] text-sm font-medium uppercase tracking-wider">Devices Sold</p>
-                        <span class="material-symbols-outlined text-primary">memory</span>
+                        <p class="text-[#9db9a6] text-xs font-semibold uppercase tracking-wider">Devices Sold</p>
+                        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(43,238,108,0.1);">
+                            <span class="material-symbols-outlined text-primary text-[20px]">memory</span>
+                        </div>
                     </div>
-                    <p id="stat-devices-total" class="text-white text-3xl font-bold leading-none mt-2">-</p>
+                    <p id="stat-devices-total" class="text-white text-3xl font-black leading-none mt-1">-</p>
                     <p class="text-[#9db9a6] text-xs">Total generated codes</p>
                 </div>
-                <div class="flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm hover:border-primary/30 hover:shadow-[0_0_20px_rgba(43,238,108,0.07)] transition-all duration-300">
+                <!-- Unclaimed -->
+                <div class="relative flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm overflow-hidden transition-all duration-300 hover:border-yellow-400/30 hover:shadow-[0_0_24px_rgba(250,204,21,0.08)]">
+                    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(250,204,21,0.8),rgba(250,204,21,0.2));"></div>
                     <div class="flex items-center justify-between">
-                        <p class="text-[#9db9a6] text-sm font-medium uppercase tracking-wider">Unclaimed</p>
-                        <span class="material-symbols-outlined text-yellow-400">inventory_2</span>
+                        <p class="text-[#9db9a6] text-xs font-semibold uppercase tracking-wider">Unclaimed</p>
+                        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(250,204,21,0.1);">
+                            <span class="material-symbols-outlined text-yellow-400 text-[20px]">inventory_2</span>
+                        </div>
                     </div>
-                    <p id="stat-devices-unclaimed" class="text-yellow-400 text-3xl font-bold leading-none mt-2">-</p>
+                    <p id="stat-devices-unclaimed" class="text-yellow-400 text-3xl font-black leading-none mt-1">-</p>
                     <p class="text-[#9db9a6] text-xs">Awaiting farmer claim</p>
                 </div>
-                <div class="flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm hover:border-primary/30 hover:shadow-[0_0_20px_rgba(43,238,108,0.07)] transition-all duration-300">
+                <!-- Active Farmers -->
+                <div class="relative flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm overflow-hidden transition-all duration-300 hover:border-blue-400/30 hover:shadow-[0_0_24px_rgba(96,165,250,0.08)]">
+                    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(96,165,250,0.8),rgba(96,165,250,0.2));"></div>
                     <div class="flex items-center justify-between">
-                        <p class="text-[#9db9a6] text-sm font-medium uppercase tracking-wider">Active Farmers</p>
-                        <span class="material-symbols-outlined text-blue-400">groups</span>
+                        <p class="text-[#9db9a6] text-xs font-semibold uppercase tracking-wider">Active Farmers</p>
+                        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(96,165,250,0.1);">
+                            <span class="material-symbols-outlined text-blue-400 text-[20px]">groups</span>
+                        </div>
                     </div>
-                    <p id="stat-active-farmers" class="text-blue-400 text-3xl font-bold leading-none mt-2">-</p>
+                    <p id="stat-active-farmers" class="text-blue-400 text-3xl font-black leading-none mt-1">-</p>
                     <p class="text-[#9db9a6] text-xs">Devices claimed & in use</p>
                 </div>
-                <div class="flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm hover:border-primary/30 hover:shadow-[0_0_20px_rgba(43,238,108,0.07)] transition-all duration-300">
+                <!-- Open Tickets -->
+                <div class="relative flex flex-col gap-2 rounded-xl p-6 bg-[#1c271f] border border-[#28392e] shadow-sm overflow-hidden transition-all duration-300 hover:border-orange-400/30 hover:shadow-[0_0_24px_rgba(251,146,60,0.08)]">
+                    <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(251,146,60,0.8),rgba(251,146,60,0.2));"></div>
                     <div class="flex items-center justify-between">
-                        <p class="text-[#9db9a6] text-sm font-medium uppercase tracking-wider">Open Tickets</p>
-                        <span class="material-symbols-outlined text-orange-400">headset_mic</span>
+                        <p class="text-[#9db9a6] text-xs font-semibold uppercase tracking-wider">Open Tickets</p>
+                        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background:rgba(251,146,60,0.1);">
+                            <span class="material-symbols-outlined text-orange-400 text-[20px]">headset_mic</span>
+                        </div>
                     </div>
-                    <p id="stat-open-tickets" class="text-orange-400 text-3xl font-bold leading-none mt-2">-</p>
+                    <p id="stat-open-tickets" class="text-orange-400 text-3xl font-black leading-none mt-1">-</p>
                     <p class="text-[#9db9a6] text-xs">Awaiting admin response</p>
                 </div>
             </section>
@@ -407,44 +872,31 @@
             </div>
 
             <!-- User Management Page -->
-            <div id="page-users" class="hidden">
-                <div class="bg-[#1c271f] rounded-xl border border-[#28392e] shadow-sm overflow-hidden">
-                    <!-- Header with Search and Filters -->
-                    <div class="p-5 border-b border-[#28392e] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <h2 class="text-white text-lg font-bold">All Farmers</h2>
-                        <div class="flex flex-col sm:flex-row gap-3">
-                            <!-- Search Input -->
-                            <div class="relative w-full sm:w-64">
-                                <span class="material-symbols-outlined absolute left-3 top-2.5 text-[#9db9a6] text-[20px]">search</span>
-                                <input id="search-users" class="w-full pl-10 py-2 bg-[#111813] border border-[#3b5443] text-white rounded-lg text-sm focus:ring-primary focus:border-primary" placeholder="Search users..." type="text"/>
-                            </div>
-                            <!-- Status Filter -->
-                            <select id="filter-user-status" class="py-2 px-3 bg-[#111813] border border-[#3b5443] text-white rounded-lg text-sm focus:ring-primary focus:border-primary">
-                                <option value="all">All Status</option>
-                                <option value="active">Active</option>
-                                <option value="pending">Pending</option>
-                                <option value="inactive">Inactive</option>
-                            </select>
+            <div id="page-users" class="hidden space-y-5">
+                <!-- Header bar -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h2 class="text-white text-xl font-bold">Farmers</h2>
+                        <p class="text-[#9db9a6] text-sm mt-0.5">Manage registered farmer accounts</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-2.5 text-[#9db9a6] text-[18px]">search</span>
+                            <input id="search-users" type="text" placeholder="Search farmers..."
+                                class="pl-9 pr-4 py-2 bg-[#1c271f] border border-[#3b5443] text-white rounded-xl text-sm focus:outline-none focus:border-primary w-52"/>
                         </div>
+                        <select id="filter-user-status"
+                            class="px-3 py-2 bg-[#1c271f] border border-[#3b5443] text-white rounded-xl text-sm focus:outline-none focus:border-primary">
+                            <option value="all">All</option>
+                            <option value="active">Active</option>
+                            <option value="pending">Pending</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
                     </div>
-                    <!-- Users Table -->
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-[#161f19] text-xs uppercase text-[#9db9a6] font-semibold">
-                                <tr>
-                                    <th class="p-4">User</th>
-                                    <th class="p-4">Email</th>
-                                    <th class="p-4">Farm Name</th>
-                                    <th class="p-4">Status</th>
-                                    <th class="p-4">Joined</th>
-                                    <th class="p-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="all-users-tbody" class="text-sm divide-y divide-[#28392e]">
-                                <tr><td colspan="6" class="p-4 text-center text-[#9db9a6]">Loading users...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                </div>
+                <!-- Farmer cards grid -->
+                <div id="farmers-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <div class="col-span-full p-8 text-center text-[#9db9a6]">Loading farmers...</div>
                 </div>
             </div>
 
@@ -871,84 +1323,6 @@
                         </div>
                     </div>
 
-                    <!-- System Configuration -->
-                    <div class="bg-[#1c271f] rounded-xl border border-[#28392e] shadow-sm p-5">
-                        <h2 class="text-white text-xl font-bold mb-5">System Configuration</h2>
-
-                        <div class="space-y-4">
-                            <!-- Sensor Alert Thresholds -->
-                            <div class="p-4 bg-[#28392e] rounded-lg">
-                                <div class="flex items-center justify-between mb-3">
-                                    <div>
-                                        <h3 class="text-white font-medium">Sensor Alert Thresholds</h3>
-                                        <p class="text-[#9db9a6] text-sm">Configure warning levels for sensor readings</p>
-                                    </div>
-                                    <button id="edit-thresholds-btn" class="text-primary hover:text-[#5fa671] font-medium text-sm transition-colors">
-                                        Configure
-                                    </button>
-                                </div>
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
-                                    <div class="text-center">
-                                        <p class="text-[#9db9a6] text-xs mb-1">Soil Min</p>
-                                        <p class="text-white text-sm font-medium"><span id="threshold-soil-min">20</span>%</p>
-                                    </div>
-                                    <div class="text-center">
-                                        <p class="text-[#9db9a6] text-xs mb-1">Temp Max</p>
-                                        <p class="text-white text-sm font-medium"><span id="threshold-temp-max">40</span>°C</p>
-                                    </div>
-                                    <div class="text-center">
-                                        <p class="text-[#9db9a6] text-xs mb-1">Water Min</p>
-                                        <p class="text-white text-sm font-medium"><span id="threshold-water-min">20</span>%</p>
-                                    </div>
-                                    <div class="text-center">
-                                        <p class="text-[#9db9a6] text-xs mb-1">pH Range</p>
-                                        <p class="text-white text-sm font-medium"><span id="threshold-ph-range">5.5-7.5</span></p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Auto-delete Old Data -->
-                            <div class="p-4 bg-[#28392e] rounded-lg flex items-center justify-between">
-                                <div>
-                                    <h3 class="text-white font-medium">Auto-delete Old Data</h3>
-                                    <p class="text-[#9db9a6] text-sm">Automatically remove sensor data older than 90 days</p>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="auto-delete-toggle" class="sr-only peer" checked>
-                                    <div class="w-11 h-6 bg-[#1c271f] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                </label>
-                            </div>
-
-                            <!-- Notification Settings -->
-                            <div class="p-4 bg-[#28392e] rounded-lg flex items-center justify-between">
-                                <div>
-                                    <h3 class="text-white font-medium">Email Notifications</h3>
-                                    <p class="text-[#9db9a6] text-sm">Receive email alerts for critical system events</p>
-                                </div>
-                                <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="email-notif-toggle" class="sr-only peer" checked>
-                                    <div class="w-11 h-6 bg-[#1c271f] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                </label>
-                            </div>
-
-                            <!-- Device Timeout -->
-                            <div class="p-4 bg-[#28392e] rounded-lg">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <h3 class="text-white font-medium">Device Offline Timeout</h3>
-                                        <p class="text-[#9db9a6] text-sm">Mark devices as offline after inactivity</p>
-                                    </div>
-                                    <select id="device-timeout-select" class="py-2 px-3 bg-[#111813] border border-[#3b5443] text-white rounded-lg text-sm focus:ring-primary focus:border-primary">
-                                        <option value="300000">5 minutes</option>
-                                        <option value="600000">10 minutes</option>
-                                        <option value="900000">15 minutes</option>
-                                        <option value="1800000">30 minutes</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Database Management -->
                     <div class="bg-[#1c271f] rounded-xl border border-[#28392e] shadow-sm p-5">
                         <h2 class="text-white text-xl font-bold mb-5">Database Management</h2>
@@ -1050,19 +1424,23 @@
                 <div class="grid gap-5">
                     <!-- Stats Row -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div class="bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1">
+                        <div class="relative bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1 overflow-hidden transition-all hover:border-white/15">
+                            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(255,255,255,0.5),rgba(255,255,255,0.1));"></div>
                             <p class="text-[#9db9a6] text-xs uppercase tracking-wider">Total Devices</p>
                             <p id="dev-total" class="text-white text-2xl font-bold">-</p>
                         </div>
-                        <div class="bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1">
+                        <div class="relative bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1 overflow-hidden transition-all hover:border-primary/30">
+                            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(43,238,108,0.8),rgba(43,238,108,0.2));"></div>
                             <p class="text-[#9db9a6] text-xs uppercase tracking-wider">Available</p>
                             <p id="dev-available" class="text-primary text-2xl font-bold">-</p>
                         </div>
-                        <div class="bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1">
+                        <div class="relative bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1 overflow-hidden transition-all hover:border-blue-400/30">
+                            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(96,165,250,0.8),rgba(96,165,250,0.2));"></div>
                             <p class="text-[#9db9a6] text-xs uppercase tracking-wider">Claimed</p>
                             <p id="dev-claimed" class="text-blue-400 text-2xl font-bold">-</p>
                         </div>
-                        <div class="bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1">
+                        <div class="relative bg-[#1c271f] border border-[#28392e] rounded-xl p-4 flex flex-col gap-1 overflow-hidden transition-all hover:border-red-400/30">
+                            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(248,113,113,0.8),rgba(248,113,113,0.2));"></div>
                             <p class="text-[#9db9a6] text-xs uppercase tracking-wider">Inactive</p>
                             <p id="dev-inactive" class="text-red-400 text-2xl font-bold">-</p>
                         </div>
@@ -1112,9 +1490,14 @@
             <!-- Generate Code Modal -->
             <div id="generate-code-modal" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
                 <div class="bg-[#1c271f] rounded-xl border border-[#28392e] shadow-xl w-full max-w-md m-4">
-                    <div class="p-5 border-b border-[#28392e] flex items-center justify-between">
-                        <h3 class="text-white text-lg font-bold">Generate Device Code</h3>
-                        <button id="close-generate-modal" class="text-[#9db9a6] hover:text-white"><span class="material-symbols-outlined">close</span></button>
+                    <div class="p-5 border-b border-[#28392e] flex items-center justify-between" style="background:linear-gradient(135deg,rgba(43,238,108,0.09) 0%,rgba(43,238,108,0.02) 100%);">
+                        <div class="flex items-center gap-3">
+                            <div style="width:34px;height:34px;border-radius:9px;background:rgba(43,238,108,0.12);border:1px solid rgba(43,238,108,0.25);display:flex;align-items:center;justify-content:center;">
+                                <span class="material-symbols-outlined text-primary text-[18px]">add_circle</span>
+                            </div>
+                            <h3 class="text-white text-lg font-bold">Generate Device Code</h3>
+                        </div>
+                        <button id="close-generate-modal" class="w-8 h-8 flex items-center justify-center rounded-full bg-[#28392e] text-[#9db9a6] hover:text-white transition-colors"><span class="material-symbols-outlined text-[18px]">close</span></button>
                     </div>
                     <div class="p-5 space-y-4">
                         <div id="generated-code-display" class="hidden bg-[#111813] border border-primary/40 rounded-xl p-5 text-center">
@@ -1146,15 +1529,18 @@
 
                         <!-- Stats bar -->
                         <div class="grid grid-cols-3 gap-2">
-                            <div class="bg-[#1c271f] border border-[#28392e] rounded-xl px-3 py-2.5 text-center">
+                            <div class="relative bg-[#1c271f] border border-[#28392e] rounded-xl px-3 py-2.5 text-center overflow-hidden">
+                                <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(43,238,108,0.8),rgba(43,238,108,0.1));"></div>
                                 <p id="sup-count-open" class="text-primary font-bold text-xl leading-none">0</p>
                                 <p class="text-[#9db9a6] text-[10px] mt-0.5 font-medium">OPEN</p>
                             </div>
-                            <div class="bg-[#1c271f] border border-[#28392e] rounded-xl px-3 py-2.5 text-center">
+                            <div class="relative bg-[#1c271f] border border-[#28392e] rounded-xl px-3 py-2.5 text-center overflow-hidden">
+                                <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(251,146,60,0.8),rgba(251,146,60,0.1));"></div>
                                 <p id="sup-count-active" class="text-orange-400 font-bold text-xl leading-none">0</p>
                                 <p class="text-[#9db9a6] text-[10px] mt-0.5 font-medium">ACTIVE</p>
                             </div>
-                            <div class="bg-[#1c271f] border border-[#28392e] rounded-xl px-3 py-2.5 text-center">
+                            <div class="relative bg-[#1c271f] border border-[#28392e] rounded-xl px-3 py-2.5 text-center overflow-hidden">
+                                <div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,rgba(107,114,128,0.8),rgba(107,114,128,0.1));"></div>
                                 <p id="sup-count-resolved" class="text-[#6b7280] font-bold text-xl leading-none">0</p>
                                 <p class="text-[#9db9a6] text-[10px] mt-0.5 font-medium">RESOLVED</p>
                             </div>
@@ -1266,124 +1652,131 @@
             </div>
 
             <!-- User Details Modal -->
-            <div id="user-details-modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
-                <div class="bg-[#1c271f] rounded-xl border border-[#28392e] shadow-xl max-w-4xl w-full m-4 my-8">
-                    <!-- Modal Header -->
-                    <div class="p-5 border-b border-[#28392e] flex items-center justify-between">
-                        <h3 class="text-white text-lg font-bold">User Details</h3>
-                        <button id="close-user-modal" class="text-[#9db9a6] hover:text-white transition-colors">
-                            <span class="material-symbols-outlined">close</span>
-                        </button>
-                    </div>
-                    <!-- Modal Body -->
-                    <div class="p-6 space-y-6">
-                        <!-- Profile Photo & Basic Info -->
-                        <div class="flex items-start gap-6 p-4 bg-[#28392e] rounded-lg">
-                            <div id="modal-user-photo" class="flex-shrink-0">
-                                <div class="w-20 h-20 rounded-full bg-[#1c271f] flex items-center justify-center text-white font-bold text-2xl">
-                                    U
+            <div id="user-details-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div class="bg-[#131f16] rounded-2xl border border-[#3b5443] shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden relative">
+
+                    <!-- Close -->
+                    <button id="close-user-modal" class="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-[#28392e] text-[#9db9a6] hover:text-white transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+
+                    <!-- Hero header -->
+                    <div class="p-6 pb-5 flex-shrink-0" style="background:linear-gradient(135deg,rgba(43,238,108,0.1) 0%,rgba(43,238,108,0.02) 100%);border-bottom:1px solid #3b5443">
+                        <div class="flex items-start gap-5">
+                            <div id="modal-user-photo" class="flex-shrink-0 w-20 h-20 rounded-2xl overflow-hidden flex items-center justify-center text-2xl font-bold text-white"
+                                 style="background:rgba(43,238,108,0.15);border:2px solid rgba(43,238,108,0.3)">U</div>
+                            <div class="flex-1 min-w-0 pt-1 pr-10">
+                                <div class="flex items-center gap-3 flex-wrap">
+                                    <h3 id="modal-user-name" class="text-white text-xl font-bold">—</h3>
+                                    <span id="modal-user-status-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary/15 text-primary">Active</span>
                                 </div>
-                            </div>
-                            <div class="flex-1 grid grid-cols-2 gap-4">
-                                <div>
-                                    <p class="text-[#9db9a6] text-sm mb-1">Full Name</p>
-                                    <p id="modal-user-name" class="text-white font-medium">-</p>
-                                </div>
-                                <div>
-                                    <p class="text-[#9db9a6] text-sm mb-1">Email</p>
-                                    <p id="modal-user-email" class="text-white font-medium break-all">-</p>
-                                </div>
-                                <div>
-                                    <p class="text-[#9db9a6] text-sm mb-1">Phone Number</p>
-                                    <p id="modal-user-phone" class="text-white font-medium">-</p>
-                                </div>
-                                <div>
-                                    <p class="text-[#9db9a6] text-sm mb-1">Role</p>
-                                    <p id="modal-user-role" class="text-white font-medium capitalize">-</p>
-                                </div>
-                                <div>
-                                    <p class="text-[#9db9a6] text-sm mb-1">Status</p>
-                                    <p id="modal-user-status" class="text-white font-medium capitalize">-</p>
-                                </div>
-                                <div>
-                                    <p class="text-[#9db9a6] text-sm mb-1">Created At</p>
-                                    <p id="modal-user-created" class="text-white font-medium">-</p>
-                                </div>
+                                <p id="modal-user-email" class="text-[#9db9a6] text-sm mt-1">—</p>
+                                <p class="text-[#9db9a6] text-xs mt-0.5">
+                                    <span class="font-mono" id="modal-user-id-inline">—</span>
+                                    <span class="mx-2 opacity-40">·</span>Joined <span id="modal-user-joined">—</span>
+                                </p>
                             </div>
                         </div>
+                        <!-- Stats -->
+                        <div class="grid grid-cols-3 gap-3 mt-5">
+                            <div class="bg-[#1c271f] rounded-xl px-4 py-3 text-center border border-[#3b5443]">
+                                <p id="modal-stat-crops" class="text-primary text-xl font-bold">0</p>
+                                <p class="text-[#9db9a6] text-xs mt-0.5">Crops</p>
+                            </div>
+                            <div class="bg-[#1c271f] rounded-xl px-4 py-3 text-center border border-[#3b5443]">
+                                <p id="modal-stat-devices" class="text-primary text-xl font-bold">0</p>
+                                <p class="text-[#9db9a6] text-xs mt-0.5">Devices</p>
+                            </div>
+                            <div class="bg-[#1c271f] rounded-xl px-4 py-3 text-center border border-[#3b5443]">
+                                <p id="modal-stat-tickets" class="text-primary text-xl font-bold">0</p>
+                                <p class="text-[#9db9a6] text-xs mt-0.5">Tickets</p>
+                            </div>
+                        </div>
+                    </div>
 
-                        <!-- User IDs and Password -->
-                        <div class="grid grid-cols-3 gap-4">
-                            <div class="p-4 bg-[#28392e] rounded-lg">
-                                <p class="text-[#9db9a6] text-sm mb-1">User ID (Custom)</p>
-                                <p id="modal-user-id" class="text-white font-mono text-xs break-all">-</p>
+                    <!-- Tab bar -->
+                    <div class="flex border-b border-[#3b5443] px-6 bg-[#131f16] flex-shrink-0">
+                        <button data-tab="profile" class="modal-tab-btn px-4 py-3 text-sm font-semibold text-primary border-b-2 border-primary">Profile</button>
+                        <button data-tab="farm"    class="modal-tab-btn px-4 py-3 text-sm font-semibold text-[#9db9a6] border-b-2 border-transparent hover:text-white">Farm</button>
+                        <button data-tab="crops"   class="modal-tab-btn px-4 py-3 text-sm font-semibold text-[#9db9a6] border-b-2 border-transparent hover:text-white">Crops</button>
+                    </div>
+
+                    <!-- Scrollable tab content -->
+                    <div class="overflow-y-auto flex-1 p-6">
+
+                        <!-- Profile tab -->
+                        <div id="modal-tab-profile" class="space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                    <p class="text-[#9db9a6] text-xs mb-1">Phone</p>
+                                    <p id="modal-user-phone" class="text-white text-sm font-medium">—</p>
+                                </div>
+                                <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                    <p class="text-[#9db9a6] text-xs mb-1">Role</p>
+                                    <p id="modal-user-role" class="text-white text-sm font-medium capitalize">farmer</p>
+                                </div>
                             </div>
-                            <div class="p-4 bg-[#28392e] rounded-lg">
-                                <p class="text-[#9db9a6] text-sm mb-1">Firebase Auth UID</p>
-                                <p id="modal-user-uid" class="text-white font-mono text-xs break-all">-</p>
+                            <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                <p class="text-[#9db9a6] text-xs mb-1">Custom User ID</p>
+                                <p id="modal-user-id" class="text-white text-sm font-mono">—</p>
                             </div>
-                            <div class="p-4 bg-[#28392e] rounded-lg">
-                                <p class="text-[#9db9a6] text-sm mb-1">Password</p>
+                            <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                <p class="text-[#9db9a6] text-xs mb-1">Firebase Auth UID</p>
+                                <p id="modal-user-uid" class="text-white text-sm font-mono break-all">—</p>
+                            </div>
+                            <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                <p class="text-[#9db9a6] text-xs mb-2">Password</p>
                                 <div class="flex items-center gap-2">
-                                    <p id="modal-user-password" class="text-white font-mono text-xs flex-1">••••••••</p>
-                                    <button id="toggle-password-visibility" class="text-[#9db9a6] hover:text-white transition-colors" title="Show/Hide Password">
+                                    <p id="modal-user-password" class="text-white text-sm font-mono flex-1">••••••••</p>
+                                    <button id="toggle-password-visibility" class="text-[#9db9a6] hover:text-white transition-colors">
                                         <span class="material-symbols-outlined text-[18px]">visibility</span>
                                     </button>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Farm Information -->
-                        <div>
-                            <h4 class="text-white font-semibold mb-3 flex items-center gap-2">
-                                <span class="material-symbols-outlined text-primary">agriculture</span>
-                                Farm Information
-                            </h4>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="p-4 bg-[#28392e] rounded-lg">
-                                    <p class="text-[#9db9a6] text-sm mb-1">Farm Name</p>
-                                    <p id="modal-user-farm" class="text-white font-medium">-</p>
+                            <div class="grid grid-cols-2 gap-3 text-xs">
+                                <div class="bg-[#1c271f] rounded-xl p-3 border border-[#3b5443]">
+                                    <p class="text-[#9db9a6] mb-1">Account Created</p>
+                                    <p id="modal-user-created" class="text-white font-mono">—</p>
                                 </div>
-                                <div class="p-4 bg-[#28392e] rounded-lg">
-                                    <p class="text-[#9db9a6] text-sm mb-1">Farm Size</p>
-                                    <p id="modal-farm-size" class="text-white font-medium">-</p>
-                                </div>
-                                <div class="p-4 bg-[#28392e] rounded-lg col-span-2">
-                                    <p class="text-[#9db9a6] text-sm mb-1">Farm Location</p>
-                                    <p id="modal-farm-location" class="text-white font-medium">-</p>
-                                    <p id="modal-farm-coordinates" class="text-[#9db9a6] text-xs mt-1 font-mono">-</p>
+                                <div class="bg-[#1c271f] rounded-xl p-3 border border-[#3b5443]">
+                                    <p class="text-[#9db9a6] mb-1">Last Updated</p>
+                                    <p id="modal-user-updated" class="text-white font-mono">—</p>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Crops Information -->
-                        <div>
-                            <h4 class="text-white font-semibold mb-3 flex items-center gap-2">
-                                <span class="material-symbols-outlined text-primary">eco</span>
-                                Crops Planted
-                            </h4>
-                            <div id="modal-user-crops" class="p-4 bg-[#28392e] rounded-lg">
-                                <p class="text-[#9db9a6] text-sm">Loading crops...</p>
+                        <!-- Farm tab -->
+                        <div id="modal-tab-farm" class="hidden space-y-3">
+                            <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                <p class="text-[#9db9a6] text-xs mb-1">Farm Name</p>
+                                <p id="modal-user-farm" class="text-white font-medium">—</p>
+                            </div>
+                            <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                <p class="text-[#9db9a6] text-xs mb-1">Farm Size</p>
+                                <p id="modal-farm-size" class="text-white font-medium">—</p>
+                            </div>
+                            <div class="bg-[#1c271f] rounded-xl p-4 border border-[#3b5443]">
+                                <p class="text-[#9db9a6] text-xs mb-1">Location</p>
+                                <p id="modal-farm-location" class="text-white font-medium">—</p>
+                                <p id="modal-farm-coordinates" class="text-[#9db9a6] text-xs mt-1 font-mono"></p>
                             </div>
                         </div>
 
-                        <!-- Timestamps -->
-                        <div class="grid grid-cols-2 gap-4 text-xs">
-                            <div>
-                                <p class="text-[#9db9a6] mb-1">Last Updated</p>
-                                <p id="modal-user-updated" class="text-white font-mono">-</p>
-                            </div>
-                            <div>
-                                <p class="text-[#9db9a6] mb-1">Account Created</p>
-                                <p class="text-white font-mono"><span id="modal-user-created-copy"></span></p>
+                        <!-- Crops tab -->
+                        <div id="modal-tab-crops" class="hidden">
+                            <div id="modal-user-crops">
+                                <div class="text-center py-10 text-[#9db9a6]">Loading crops...</div>
                             </div>
                         </div>
+
                     </div>
-                    <!-- Modal Footer -->
-                    <div class="p-5 border-t border-[#28392e] flex justify-end gap-3">
-                        <button id="close-user-modal-btn" class="px-4 py-2 bg-[#28392e] text-white rounded-lg hover:bg-[#3b5443] transition-colors">
-                            Close
+
+                    <!-- Footer -->
+                    <div class="p-4 border-t border-[#3b5443] flex justify-between items-center bg-[#131f16] flex-shrink-0">
+                        <button id="modal-delete-user-btn" class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-red-400 hover:bg-red-500/10 transition-colors text-sm">
+                            <span class="material-symbols-outlined text-[16px]">delete</span> Delete Account
                         </button>
+                        <button id="close-user-modal-btn" class="px-5 py-2 bg-[#28392e] text-white rounded-xl hover:bg-[#3b5443] transition-colors text-sm font-medium">Close</button>
                     </div>
                 </div>
             </div>
@@ -1549,6 +1942,19 @@
     });
     observer.observe(document.getElementById('dashboard-screen'), { attributes: true, attributeFilter: ['class'] });
 
+    // Show/hide ambient background layer with dashboard visibility
+    const bgObserver = new MutationObserver(() => {
+        const dashVisible = !document.getElementById('dashboard-screen').classList.contains('hidden');
+        const bgLayer = document.getElementById('dash-bg-layer');
+        if (bgLayer) bgLayer.style.display = dashVisible ? 'block' : 'none';
+    });
+    bgObserver.observe(document.getElementById('dashboard-screen'), { attributes: true, attributeFilter: ['class'] });
+    // Init state
+    (function() {
+        const bgLayer = document.getElementById('dash-bg-layer');
+        if (bgLayer) bgLayer.style.display = 'none';
+    })();
+
     // Mobile nav items sync with desktop nav
     document.querySelectorAll('.mobile-nav-item').forEach(item => {
         item.addEventListener('click', () => {
@@ -1563,5 +1969,134 @@
         });
     });
 </script>
+
+<!-- Report Preview Modal -->
+<div id="report-preview-modal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-[#131f16] border border-[#3b5443] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-[#3b5443] flex-shrink-0" style="background:linear-gradient(135deg,rgba(43,238,108,0.09) 0%,rgba(43,238,108,0.02) 100%);">
+            <div class="flex items-center gap-3">
+                <div style="width:38px;height:38px;border-radius:10px;background:rgba(43,238,108,0.12);border:1px solid rgba(43,238,108,0.25);display:flex;align-items:center;justify-content:center;">
+                    <span class="material-symbols-outlined text-primary text-[20px]">preview</span>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold">Report Preview</h3>
+                    <p class="text-[#9db9a6] text-xs mt-0.5">Review before downloading</p>
+                </div>
+            </div>
+            <button id="close-report-preview" class="w-8 h-8 flex items-center justify-center rounded-full bg-[#28392e] text-[#9db9a6] hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-[18px]">close</span>
+            </button>
+        </div>
+
+        <!-- Scrollable body -->
+        <div class="overflow-y-auto flex-1 p-6 space-y-5">
+
+            <!-- Report metadata -->
+            <div class="bg-[#1c271f] rounded-xl border border-[#3b5443] p-4">
+                <p class="text-[#9db9a6] text-xs uppercase font-semibold mb-3">Report Details</p>
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p class="text-[#9db9a6] text-xs mb-0.5">Farm</p>
+                        <p id="rp-farm" class="text-white font-medium">—</p>
+                    </div>
+                    <div>
+                        <p class="text-[#9db9a6] text-xs mb-0.5">Crop</p>
+                        <p id="rp-crop" class="text-white font-medium">—</p>
+                    </div>
+                    <div>
+                        <p class="text-[#9db9a6] text-xs mb-0.5">Time Range</p>
+                        <p id="rp-range" class="text-white font-medium">—</p>
+                    </div>
+                    <div>
+                        <p class="text-[#9db9a6] text-xs mb-0.5">Generated By</p>
+                        <p id="rp-admin" class="text-white font-medium">—</p>
+                    </div>
+                    <div class="col-span-2">
+                        <p class="text-[#9db9a6] text-xs mb-0.5">Generated At</p>
+                        <p id="rp-date" class="text-white font-medium font-mono">—</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats snapshot -->
+            <div>
+                <p class="text-[#9db9a6] text-xs uppercase font-semibold mb-2">Sensor Summary</p>
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-[#1c271f] rounded-xl border border-[#3b5443] p-4 text-center">
+                        <div class="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center" style="background:rgba(74,222,128,0.15)">
+                            <span class="material-symbols-outlined text-[16px]" style="color:#4ade80">water_drop</span>
+                        </div>
+                        <p id="rp-soil" class="text-white font-bold text-lg">—</p>
+                        <p class="text-[#9db9a6] text-xs mt-0.5">Soil Moisture</p>
+                    </div>
+                    <div class="bg-[#1c271f] rounded-xl border border-[#3b5443] p-4 text-center">
+                        <div class="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center" style="background:rgba(251,146,60,0.15)">
+                            <span class="material-symbols-outlined text-[16px]" style="color:#fb923c">thermometer</span>
+                        </div>
+                        <p id="rp-temp" class="text-white font-bold text-lg">—</p>
+                        <p class="text-[#9db9a6] text-xs mt-0.5">Temperature</p>
+                    </div>
+                    <div class="bg-[#1c271f] rounded-xl border border-[#3b5443] p-4 text-center">
+                        <div class="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center" style="background:rgba(192,132,252,0.15)">
+                            <span class="material-symbols-outlined text-[16px]" style="color:#c084fc">science</span>
+                        </div>
+                        <p id="rp-ph" class="text-white font-bold text-lg">—</p>
+                        <p class="text-[#9db9a6] text-xs mt-0.5">pH Level</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chart previews -->
+            <div>
+                <p class="text-[#9db9a6] text-xs uppercase font-semibold mb-2">Chart Previews</p>
+                <div class="space-y-3" id="rp-charts">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+
+            <!-- Sections included -->
+            <div class="bg-[#1c271f] rounded-xl border border-[#3b5443] p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="material-symbols-outlined text-[#9db9a6] text-[16px]">picture_as_pdf</span>
+                    <p class="text-[#9db9a6] text-xs uppercase font-semibold">2-Page PDF Contents</p>
+                </div>
+                <div class="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div>
+                        <p class="text-[#9db9a6] text-[10px] uppercase font-semibold mb-1.5 mt-1">Page 1 — Overview</p>
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Report Header &amp; Metadata</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Filter Summary (Farm / Crop / Range)</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>KPI Cards (Devices / Farmers / Crops / Tickets)</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Device Status Chart</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Ticket Status Chart</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Crop Distribution Chart</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Sensor Stats (Soil · Temp · pH)</div>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-[#9db9a6] text-[10px] uppercase font-semibold mb-1.5 mt-1">Page 2 — Sensor Charts</p>
+                        <div class="space-y-1.5">
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Soil Moisture Trend</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Temperature Trend</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Humidity Trend</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>pH Level Trend</div>
+                            <div class="flex items-center gap-1.5 text-xs text-white"><span class="material-symbols-outlined text-primary text-[13px]">check_circle</span>Water Tank Level Trend</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-[#3b5443] flex items-center justify-between bg-[#131f16] flex-shrink-0">
+            <button id="rp-cancel-btn" class="px-4 py-2 text-[#9db9a6] hover:text-white transition-colors text-sm">Cancel</button>
+            <button id="rp-download-btn" class="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl hover:bg-[#5fa671] transition-colors text-sm font-semibold">
+                <span class="material-symbols-outlined text-[18px]">download</span>Download PDF
+            </button>
+        </div>
+    </div>
+</div>
 </body>
 </html>
