@@ -160,9 +160,11 @@ function navigateToPage(pageName) {
 
     const titles = {
         'overview': 'Dashboard Overview',
-        'users': 'User Management',
-        'farms': 'Farm Management',
-        'analytics': 'Reporting & Analytics',
+        'users': 'Farmers',
+        'farms': 'Farm Details',
+        'devices': 'Device Inventory',
+        'support': 'Support Tickets',
+        'analytics': 'Farm Analytics',
         'notifications': 'Notifications',
         'settings': 'Settings'
     };
@@ -173,6 +175,10 @@ function navigateToPage(pageName) {
         loadAllUsers();
     } else if (pageName === 'farms') {
         loadAllFarms();
+    } else if (pageName === 'devices') {
+        loadDevicesPage();
+    } else if (pageName === 'support') {
+        loadSupportPage();
     } else if (pageName === 'notifications') {
         loadAllNotifications();
     } else if (pageName === 'analytics') {
@@ -191,16 +197,130 @@ let dashboardSelectedCrop = null;
 async function loadDashboardData() {
     try {
         await Promise.all([
-            loadTotalUsers(),
-            loadTotalFarms(),
-            loadTotalCrops(),
+            loadOverviewDeviceStats(),
+            loadOverviewRecentDevices(),
+            loadOverviewRecentTickets(),
             loadRecentUsers(),
-            loadRecentFarms(),
-            loadDashboardChart(),
-            loadDashboardAnnouncements()
         ]);
     } catch (error) {
         console.error('Error loading dashboard data:', error);
+    }
+}
+
+// Load device-centric stat cards
+async function loadOverviewDeviceStats() {
+    try {
+        const snap = await db.collection('devices').get();
+        const devices = snap.docs.map(d => d.data());
+        const total = devices.length;
+        const unclaimed = devices.filter(d => d.status === 'available').length;
+        const claimed = devices.filter(d => d.status === 'claimed').length;
+
+        document.getElementById('stat-devices-total').textContent = total;
+        document.getElementById('stat-devices-unclaimed').textContent = unclaimed;
+        document.getElementById('stat-active-farmers').textContent = claimed;
+    } catch (err) {
+        console.error('Device stats error:', err);
+    }
+
+    try {
+        const ticketSnap = await db.collection('support_tickets')
+            .where('status', 'in', ['open', 'in_progress'])
+            .get();
+        const openCount = ticketSnap.size;
+        document.getElementById('stat-open-tickets').textContent = openCount;
+
+        const badge = document.getElementById('quick-ticket-badge');
+        if (badge) {
+            if (openCount > 0) {
+                badge.textContent = openCount;
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+    } catch (err) {
+        console.error('Ticket stats error:', err);
+    }
+}
+
+// Load recent devices for overview table
+async function loadOverviewRecentDevices() {
+    try {
+        const snap = await db.collection('devices').orderBy('created_at', 'desc').limit(8).get();
+        const tbody = document.getElementById('overview-devices-tbody');
+        if (!tbody) return;
+
+        if (snap.empty) {
+            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-[#9db9a6]">No devices yet — generate your first code</td></tr>';
+            return;
+        }
+
+        const statusColors = {
+            available: 'bg-primary/10 text-primary',
+            claimed:   'bg-blue-400/10 text-blue-400',
+            inactive:  'bg-red-400/10 text-red-400',
+        };
+
+        tbody.innerHTML = snap.docs.map(doc => {
+            const d = doc.data();
+            const statusBadge = `<span class="px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${statusColors[d.status] || 'bg-[#28392e] text-[#9db9a6]'}">${d.status || 'unknown'}</span>`;
+            const claimedBy = d.farmer_name || '<span class="text-[#9db9a6]">—</span>';
+            const date = d.created_at ? formatDate(d.created_at.toDate ? d.created_at.toDate() : new Date(d.created_at)) : '—';
+            return `<tr class="hover:bg-[#223026] transition-colors">
+                <td class="p-4 font-mono text-primary font-semibold tracking-wider">${d.unique_code || doc.id}</td>
+                <td class="p-4">${statusBadge}</td>
+                <td class="p-4 text-white">${claimedBy}</td>
+                <td class="p-4 text-[#9db9a6] text-sm">${date}</td>
+            </tr>`;
+        }).join('');
+    } catch (err) {
+        console.error('Overview devices error:', err);
+    }
+}
+
+// Load recent support tickets for overview
+async function loadOverviewRecentTickets() {
+    try {
+        const snap = await db.collection('support_tickets')
+            .orderBy('updated_at', 'desc')
+            .limit(6)
+            .get();
+
+        const container = document.getElementById('overview-tickets-list');
+        if (!container) return;
+
+        if (snap.empty) {
+            container.innerHTML = '<div class="p-6 text-center text-[#9db9a6] text-sm">No support tickets yet</div>';
+            return;
+        }
+
+        const statusColors = { open: 'text-primary', in_progress: 'text-orange-400', resolved: 'text-[#9db9a6]' };
+        const statusLabels = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved' };
+
+        container.innerHTML = snap.docs.map(doc => {
+            const t = doc.data();
+            const color = statusColors[t.status] || 'text-[#9db9a6]';
+            const label = statusLabels[t.status] || t.status;
+            const time = t.updated_at ? formatDate(t.updated_at.toDate ? t.updated_at.toDate() : new Date(t.updated_at)) : '';
+            const unread = t.unread_admin > 0 ? `<span class="w-2 h-2 rounded-full bg-orange-400 flex-shrink-0"></span>` : '';
+            return `<div class="p-4 hover:bg-[#223026] cursor-pointer transition-colors" onclick="navigateToPage('support')">
+                <div class="flex items-start gap-2">
+                    ${unread}
+                    <div class="flex-1 min-w-0">
+                        <p class="text-white text-sm font-medium truncate">${t.subject || 'No subject'}</p>
+                        <p class="text-[#9db9a6] text-xs mt-0.5">${t.farmer_name || 'Unknown'} · ${t.device_id || '—'}</p>
+                        <div class="flex items-center justify-between mt-1">
+                            <span class="text-xs font-medium ${color}">${label}</span>
+                            <span class="text-[#9db9a6] text-xs">${time}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('Overview tickets error:', err);
     }
 }
 
@@ -269,7 +389,7 @@ async function loadRecentUsers() {
         tbody.innerHTML = '';
 
         if (recentUsers.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-[#9db9a6]">No users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-[#9db9a6]">No farmers found</td></tr>';
             return;
         }
 
@@ -296,13 +416,9 @@ async function loadRecentUsers() {
                         </div>
                     </td>
                     <td class="p-4 text-[#9db9a6]">${user.email || 'N/A'}</td>
+                    <td class="p-4 text-[#9db9a6] font-mono text-xs">${user.device_id || '—'}</td>
                     <td class="p-4">
                         <span class="px-2 py-1 rounded text-xs font-medium ${statusClass}">${statusText}</span>
-                    </td>
-                    <td class="p-4 text-right">
-                        <button class="text-[#9db9a6] hover:text-white transition-colors">
-                            <span class="material-symbols-outlined text-[20px]">more_vert</span>
-                        </button>
                     </td>
                 </tr>
             `;
@@ -311,7 +427,7 @@ async function loadRecentUsers() {
     } catch (error) {
         console.error('Error loading recent users:', error);
         document.getElementById('recent-users-tbody').innerHTML =
-            '<tr><td colspan="4" class="p-4 text-center text-[#9db9a6]">Error loading users</td></tr>';
+            '<tr><td colspan="4" class="p-4 text-center text-[#9db9a6]">Error loading farmers</td></tr>';
     }
 }
 
@@ -758,6 +874,17 @@ async function loadDashboardAnnouncements() {
 // Refresh Data Button
 document.getElementById('refresh-btn')?.addEventListener('click', () => {
     loadDashboardData();
+});
+
+// Header Generate Code Button
+document.getElementById('header-generate-btn')?.addEventListener('click', () => {
+    navigateToPage('devices');
+    setTimeout(() => {
+        document.getElementById('generated-code-display')?.classList.add('hidden');
+        document.getElementById('gen-quantity').value = 1;
+        document.getElementById('gen-notes').value = '';
+        document.getElementById('generate-code-modal')?.classList.remove('hidden');
+    }, 200);
 });
 
 // ========================================
@@ -2308,7 +2435,9 @@ function editAdminProfile() {
 let analyticsCharts = {
     soilMoisture: null,
     temperature: null,
-    waterLevel: null
+    waterLevel: null,
+    humidity: null,
+    ph: null,
 };
 
 let selectedTimeRange = '7d'; // Default to 7 days
@@ -2321,8 +2450,212 @@ async function loadAnalyticsPage() {
         await loadAnalyticsFarms();
         await loadAnalyticsData();
         initializeTimeRangeButtons();
+        initializeDatePicker();
+        loadAdminOverview(); // fire-and-forget, non-blocking
     } catch (error) {
         console.error('Error loading analytics page:', error);
+    }
+}
+
+// Initialize Flatpickr calendar on custom date input
+function initializeDatePicker() {
+    const el = document.getElementById('analytics-custom-date');
+    if (!el || el._flatpickr) return; // already initialized
+    flatpickr(el, {
+        dateFormat: 'd M Y',
+        maxDate: 'today',
+        disableMobile: true,
+        onChange: async ([selectedDate]) => {
+            if (!selectedDate) return;
+            // Deactivate time range buttons when custom date is picked
+            ['time-24h','time-7d','time-30d','time-all'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.classList.remove('bg-primary', 'font-medium');
+                    btn.classList.add('bg-[#111813]', 'border', 'border-[#3b5443]');
+                }
+            });
+            selectedTimeRange = 'custom';
+            // Store selected date and reload
+            window._analyticsCustomDate = selectedDate;
+            await loadAnalyticsData();
+        },
+        onClear: async () => {
+            window._analyticsCustomDate = null;
+            selectedTimeRange = '7d';
+            await loadAnalyticsData();
+        }
+    });
+}
+
+// ─── Admin Overview: KPI cards + pie/bar charts ───────────────────────────────
+let overviewCharts = { deviceStatus: null, tickets: null, cropDist: null };
+
+async function loadAdminOverview() {
+    const CHART_BG = '#1c271f';
+    const TOOLTIP_STYLE = {
+        backgroundColor: '#1c271f',
+        titleColor: '#fff',
+        bodyColor: '#9db9a6',
+        borderColor: '#28392e',
+        borderWidth: 1,
+        cornerRadius: 8,
+    };
+
+    try {
+        // ── 1. Devices ──────────────────────────────────────────────────────
+        const devSnap = await db.collection('devices').get();
+        let available = 0, claimed = 0, inactive = 0;
+        devSnap.forEach(d => {
+            const s = d.data().status;
+            if (s === 'available') available++;
+            else if (s === 'claimed') claimed++;
+            else inactive++;
+        });
+        const totalDevices = devSnap.size;
+        const utilRate = totalDevices > 0 ? Math.round((claimed / totalDevices) * 100) : 0;
+
+        const kpiDev = document.getElementById('kpi-total-devices');
+        const kpiUtil = document.getElementById('kpi-utilization');
+        if (kpiDev) kpiDev.textContent = totalDevices;
+        if (kpiUtil) kpiUtil.textContent = utilRate + '% utilisation';
+
+        // Device status donut
+        const devPieCtx = document.getElementById('device-status-pie');
+        if (devPieCtx) {
+            if (overviewCharts.deviceStatus) overviewCharts.deviceStatus.destroy();
+            const devLabels  = ['Available', 'Claimed', 'Inactive'];
+            const devValues  = [available, claimed, inactive];
+            const devColors  = ['#13EC37', '#3B82F6', '#EF4444'];
+            overviewCharts.deviceStatus = new Chart(devPieCtx, {
+                type: 'doughnut',
+                data: { labels: devLabels, datasets: [{ data: devValues, backgroundColor: devColors, borderWidth: 0, hoverOffset: 18 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '62%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } }
+                    }
+                }
+            });
+            // Legend
+            const leg = document.getElementById('device-status-legend');
+            if (leg) leg.innerHTML = devLabels.map((l, i) =>
+                `<span class="flex items-center gap-1 text-xs text-[#9db9a6]">
+                    <span style="width:10px;height:10px;border-radius:50%;background:${devColors[i]};display:inline-block"></span>
+                    ${l} <strong class="text-white">${devValues[i]}</strong>
+                </span>`
+            ).join('');
+        }
+
+        // ── 2. Support Tickets ───────────────────────────────────────────────
+        let tickOpen = 0, tickProg = 0, tickDone = 0;
+        try {
+            const tSnap = await db.collection('support_tickets').get();
+            tSnap.forEach(d => {
+                const s = d.data().status;
+                if (s === 'open') tickOpen++;
+                else if (s === 'in_progress') tickProg++;
+                else tickDone++;
+            });
+        } catch (_) {}
+        const totalTickets = tickOpen + tickProg + tickDone;
+
+        const kpiTick = document.getElementById('kpi-tickets');
+        const kpiOpen = document.getElementById('kpi-open-tickets');
+        if (kpiTick) kpiTick.textContent = totalTickets;
+        if (kpiOpen) kpiOpen.textContent = tickOpen + ' open';
+
+        const tickPieCtx = document.getElementById('tickets-pie');
+        if (tickPieCtx) {
+            if (overviewCharts.tickets) overviewCharts.tickets.destroy();
+            const tLabels = ['Open', 'In Progress', 'Resolved'];
+            const tValues = [tickOpen, tickProg, tickDone];
+            const tColors = ['#13EC37', '#FBBF24', '#6B7280'];
+            overviewCharts.tickets = new Chart(tickPieCtx, {
+                type: 'doughnut',
+                data: { labels: tLabels, datasets: [{ data: tValues, backgroundColor: tColors, borderWidth: 0, hoverOffset: 18 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false, cutout: '62%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } }
+                    }
+                }
+            });
+            const tLeg = document.getElementById('tickets-legend');
+            if (tLeg) tLeg.innerHTML = tLabels.map((l, i) =>
+                `<span class="flex items-center gap-1 text-xs text-[#9db9a6]">
+                    <span style="width:10px;height:10px;border-radius:50%;background:${tColors[i]};display:inline-block"></span>
+                    ${l} <strong class="text-white">${tValues[i]}</strong>
+                </span>`
+            ).join('');
+        }
+
+        // ── 3. Active Crops + Distribution ──────────────────────────────────
+        const cropSnap = await db.collection('crops').where('status', '==', 'active').get();
+        const cropTypeCounts = {};
+        const farmerIds = new Set();
+        cropSnap.forEach(d => {
+            const data = d.data();
+            const t = data.crop_type || 'Other';
+            cropTypeCounts[t] = (cropTypeCounts[t] || 0) + 1;
+            if (data.farmer_id) farmerIds.add(data.farmer_id);
+        });
+
+        const kpiCrops   = document.getElementById('kpi-crops');
+        const kpiFarmers = document.getElementById('kpi-farmers');
+        if (kpiCrops)   kpiCrops.textContent   = cropSnap.size;
+        if (kpiFarmers) kpiFarmers.textContent  = farmerIds.size;
+
+        // Crop distribution horizontal bar
+        const cropBarCtx = document.getElementById('crop-dist-bar');
+        if (cropBarCtx) {
+            if (overviewCharts.cropDist) overviewCharts.cropDist.destroy();
+            const CROP_COLORS = ['#13EC37','#3B82F6','#F97316','#A855F7','#14B8A6','#EF4444','#FBBF24'];
+            const sorted = Object.entries(cropTypeCounts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+            const barLabels = sorted.map(([k]) => k);
+            const barValues = sorted.map(([, v]) => v);
+            const barBgColors      = barLabels.map((_, i) => CROP_COLORS[i % CROP_COLORS.length]);
+            const barHoverColors   = barBgColors.map(c => c + 'cc'); // slightly transparent on non-hovered (handled via hoverBackgroundColor)
+            // Make hover color a brighter/whiter tint by mixing with white at 20%
+            const brighten = hex => {
+                const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+                const mix = (v) => Math.min(255, Math.round(v + (255-v)*0.3)).toString(16).padStart(2,'0');
+                return `#${mix(r)}${mix(g)}${mix(b)}`;
+            };
+
+            overviewCharts.cropDist = new Chart(cropBarCtx, {
+                type: 'bar',
+                data: {
+                    labels: barLabels,
+                    datasets: [{
+                        data: barValues,
+                        backgroundColor: barBgColors,
+                        hoverBackgroundColor: barBgColors.map(brighten),
+                        borderRadius: 6,
+                        borderWidth: 0,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { ...TOOLTIP_STYLE, callbacks: { label: ctx => ` ${ctx.parsed.x} farms` } },
+                        datalabels: { display: false }
+                    },
+                    scales: {
+                        x: { display: false, grid: { display: false } },
+                        y: { grid: { display: false }, ticks: { color: '#6b7280', font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+    } catch (err) {
+        console.error('Admin overview error:', err);
     }
 }
 
@@ -2438,6 +2771,11 @@ function initializeTimeRangeButtons() {
                 });
 
                 selectedTimeRange = range;
+                window._analyticsCustomDate = null;
+                window._analyticsCustomEndTime = null;
+                // Clear the flatpickr input
+                const dp = document.getElementById('analytics-custom-date');
+                if (dp && dp._flatpickr) dp._flatpickr.clear();
                 await loadAnalyticsData();
             });
         }
@@ -2504,6 +2842,11 @@ async function loadAnalyticsData() {
             return;
         }
 
+        // Show loading state on charts
+        ['soilMoisture','temperature','waterLevel','humidity','ph'].forEach(k => {
+            if (analyticsCharts[k]) { analyticsCharts[k].destroy(); analyticsCharts[k] = null; }
+        });
+
         // Calculate time range
         const now = Date.now();
         let startTime = 0;
@@ -2517,50 +2860,42 @@ async function loadAnalyticsData() {
             case '30d':
                 startTime = now - (30 * 24 * 60 * 60 * 1000);
                 break;
+            case 'custom':
+                if (window._analyticsCustomDate) {
+                    const d = new Date(window._analyticsCustomDate);
+                    d.setHours(0, 0, 0, 0);
+                    startTime = d.getTime();
+                    // endTime = end of the selected day
+                    window._analyticsCustomEndTime = d.getTime() + 86400000 - 1;
+                } else {
+                    startTime = 0;
+                }
+                break;
             default:
                 startTime = 0; // All time
         }
 
         const startTimestamp = Math.floor(startTime / 1000);
+        const endTimestamp = selectedTimeRange === 'custom' && window._analyticsCustomEndTime
+            ? Math.floor(window._analyticsCustomEndTime / 1000)
+            : null;
+
+        // Helper: build a query with optional endAt
+        function buildQuery(ref) {
+            let q = ref.orderByKey().startAt(startTimestamp.toString());
+            if (endTimestamp) q = q.endAt(endTimestamp.toString());
+            return q;
+        }
 
         // Fetch historical sensor data for all devices
         const allHistoricalData = [];
         for (const deviceId of deviceIds) {
             try {
-                // Load historical data for soil moisture
-                const soilHistoryRef = rtdb.ref(`sensors/${deviceId}/history/soil`);
-                const soilSnapshot = await soilHistoryRef
-                    .orderByKey()
-                    .startAt(startTimestamp.toString())
-                    .once('value');
-
-                // Load historical data for temperature
-                const tempHistoryRef = rtdb.ref(`sensors/${deviceId}/history/temp`);
-                const tempSnapshot = await tempHistoryRef
-                    .orderByKey()
-                    .startAt(startTimestamp.toString())
-                    .once('value');
-
-                // Load historical data for humidity
-                const humidityHistoryRef = rtdb.ref(`sensors/${deviceId}/history/humidity`);
-                const humiditySnapshot = await humidityHistoryRef
-                    .orderByKey()
-                    .startAt(startTimestamp.toString())
-                    .once('value');
-
-                // Load historical data for pH
-                const phHistoryRef = rtdb.ref(`sensors/${deviceId}/history/ph`);
-                const phSnapshot = await phHistoryRef
-                    .orderByKey()
-                    .startAt(startTimestamp.toString())
-                    .once('value');
-
-                // Load historical data for water level
-                const waterHistoryRef = rtdb.ref(`sensors/${deviceId}/history/waterLevel`);
-                const waterSnapshot = await waterHistoryRef
-                    .orderByKey()
-                    .startAt(startTimestamp.toString())
-                    .once('value');
+                const soilSnapshot    = await buildQuery(rtdb.ref(`sensors/${deviceId}/history/soil`)).once('value');
+                const tempSnapshot    = await buildQuery(rtdb.ref(`sensors/${deviceId}/history/temp`)).once('value');
+                const humiditySnapshot= await buildQuery(rtdb.ref(`sensors/${deviceId}/history/humidity`)).once('value');
+                const phSnapshot      = await buildQuery(rtdb.ref(`sensors/${deviceId}/history/ph`)).once('value');
+                const waterSnapshot   = await buildQuery(rtdb.ref(`sensors/${deviceId}/history/waterLevel`)).once('value');
 
                 // Combine all historical data by timestamp
                 const combinedData = {};
@@ -2625,23 +2960,44 @@ async function loadAnalyticsData() {
             }
         }
 
-        // If no historical data, fall back to live data
-        if (allHistoricalData.length === 0) {
-            console.log('No historical data found, using live data');
+        // If selected range has no data, fall back to most recent available readings
+        const notice = document.getElementById('analytics-range-notice');
+        if (allHistoricalData.length === 0 && selectedTimeRange !== 'all') {
+            if (notice) notice.classList.remove('hidden');
+
+            const SENSOR_MAP = {
+                soil: 'soilMoisture', temp: 'temperature',
+                humidity: 'humidity', ph: 'ph', waterLevel: 'waterLevel',
+            };
+
+            // How many data points to fetch per sensor based on range
+            const fallbackLimit = (selectedTimeRange === '24h' || selectedTimeRange === 'custom') ? 24
+                                : selectedTimeRange === '7d' ? 168
+                                : 60;
+
             for (const deviceId of deviceIds) {
                 try {
-                    const deviceSnapshot = await rtdb.ref(`sensors/${deviceId}`).once('value');
-                    const sensorData = deviceSnapshot.val();
-                    if (sensorData) {
-                        allHistoricalData.push(sensorData);
+                    const combined = {};
+                    for (const [rtdbKey, jsKey] of Object.entries(SENSOR_MAP)) {
+                        const snap = await rtdb.ref(`sensors/${deviceId}/history/${rtdbKey}`)
+                            .orderByKey().limitToLast(fallbackLimit).once('value');
+                        if (snap.exists()) {
+                            Object.entries(snap.val()).forEach(([ts, val]) => {
+                                if (!combined[ts]) combined[ts] = { timestamp: parseInt(ts) * 1000 };
+                                combined[ts][jsKey] = val;
+                            });
+                        }
                     }
-                } catch (error) {
-                    console.error(`Error loading device ${deviceId}:`, error);
+                    Object.values(combined).forEach(dp => allHistoricalData.push(dp));
+                } catch (err) {
+                    console.error('Fallback fetch error:', err);
                 }
             }
+        } else {
+            if (notice) notice.classList.add('hidden');
         }
 
-        // Update UI with analytics
+        // Update UI with analytics (empty array shows "no data" state correctly)
         updateAnalyticsUI(allHistoricalData, allHistoricalData);
     } catch (error) {
         console.error('Error loading analytics data:', error);
@@ -2659,18 +3015,9 @@ function updateAnalyticsUI(filteredData, allData) {
         document.getElementById('ph-status').textContent = 'No Data';
 
         // Clear charts
-        if (analyticsCharts.soilMoisture) {
-            analyticsCharts.soilMoisture.destroy();
-            analyticsCharts.soilMoisture = null;
-        }
-        if (analyticsCharts.temperature) {
-            analyticsCharts.temperature.destroy();
-            analyticsCharts.temperature = null;
-        }
-        if (analyticsCharts.waterLevel) {
-            analyticsCharts.waterLevel.destroy();
-            analyticsCharts.waterLevel = null;
-        }
+        ['soilMoisture','temperature','waterLevel','humidity','ph'].forEach(k => {
+            if (analyticsCharts[k]) { analyticsCharts[k].destroy(); analyticsCharts[k] = null; }
+        });
         return;
     }
 
@@ -2761,19 +3108,28 @@ function generateCharts(data) {
         return;
     }
 
-    // Sort data by timestamp
-    const sortedData = [...data].sort((a, b) => a.timestamp - b.timestamp);
+    // Sort data by timestamp (guard against missing timestamps)
+    const sortedData = [...data]
+        .filter(d => d && d.timestamp != null && !isNaN(d.timestamp))
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+    if (sortedData.length === 0) {
+        console.log('No valid timestamped data to chart');
+        return;
+    }
 
     // Group data by hour for smoother charts
     const hourlyData = {};
     sortedData.forEach(d => {
         const hourKey = new Date(d.timestamp).toISOString().slice(0, 13); // Group by hour
         if (!hourlyData[hourKey]) {
-            hourlyData[hourKey] = { soilMoisture: [], temperature: [], waterLevel: [] };
+            hourlyData[hourKey] = { soilMoisture: [], temperature: [], waterLevel: [], humidity: [], ph: [] };
         }
         if (d.soilMoisture) hourlyData[hourKey].soilMoisture.push(d.soilMoisture);
-        if (d.temperature) hourlyData[hourKey].temperature.push(d.temperature);
-        if (d.waterLevel) hourlyData[hourKey].waterLevel.push(d.waterLevel);
+        if (d.temperature)  hourlyData[hourKey].temperature.push(d.temperature);
+        if (d.waterLevel)   hourlyData[hourKey].waterLevel.push(d.waterLevel);
+        if (d.humidity)     hourlyData[hourKey].humidity.push(d.humidity);
+        if (d.ph)           hourlyData[hourKey].ph.push(d.ph);
     });
 
     // Calculate hourly averages
@@ -2781,25 +3137,93 @@ function generateCharts(data) {
     const soilMoistureValues = [];
     const temperatureValues = [];
     const waterLevelValues = [];
+    const humidityValues = [];
+    const phValues = [];
+
+    const avg = arr => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
 
     Object.keys(hourlyData).sort().forEach(hourKey => {
         const date = new Date(hourKey + ':00:00Z');
         labels.push(date);
-
-        const avgSoil = hourlyData[hourKey].soilMoisture.length > 0
-            ? hourlyData[hourKey].soilMoisture.reduce((a, b) => a + b, 0) / hourlyData[hourKey].soilMoisture.length
-            : null;
-        const avgTemp = hourlyData[hourKey].temperature.length > 0
-            ? hourlyData[hourKey].temperature.reduce((a, b) => a + b, 0) / hourlyData[hourKey].temperature.length
-            : null;
-        const avgWater = hourlyData[hourKey].waterLevel.length > 0
-            ? hourlyData[hourKey].waterLevel.reduce((a, b) => a + b, 0) / hourlyData[hourKey].waterLevel.length
-            : null;
-
-        soilMoistureValues.push(avgSoil);
-        temperatureValues.push(avgTemp);
-        waterLevelValues.push(avgWater);
+        soilMoistureValues.push(avg(hourlyData[hourKey].soilMoisture));
+        temperatureValues.push(avg(hourlyData[hourKey].temperature));
+        waterLevelValues.push(avg(hourlyData[hourKey].waterLevel));
+        humidityValues.push(avg(hourlyData[hourKey].humidity));
+        phValues.push(avg(hourlyData[hourKey].ph));
     });
+
+    // ── Error threshold helpers ──────────────────────────────────────────────
+    const THRESHOLDS = {
+        soilMoisture: { min: 20, max: 90,  unit: '%',   label: 'Soil Moisture' },
+        temperature:  { min: 10, max: 40,  unit: '°C',  label: 'Temperature'   },
+        humidity:     { min: 20, max: 90,  unit: '%',   label: 'Humidity'      },
+        ph:           { min: 5,  max: 8,   unit: ' pH', label: 'pH Level'      },
+        waterLevel:   { min: 10, max: 100, unit: '%',   label: 'Water Level'   },
+    };
+
+    function isErr(key, v) {
+        if (v == null) return false;
+        return v < THRESHOLDS[key].min || v > THRESHOLDS[key].max;
+    }
+
+    function ptColors(key, values, normalColor) {
+        return values.map(v => isErr(key, v) ? '#ef4444' : normalColor);
+    }
+
+    function ptSizes(key, values) {
+        return values.map(v => isErr(key, v) ? 7 : 3);
+    }
+
+    function ptBorderColors(key, values) {
+        return values.map(v => isErr(key, v) ? '#ffffff' : 'transparent');
+    }
+
+    function makeTooltip(key, values) {
+        return {
+            mode: 'index', intersect: false,
+            backgroundColor: '#1c271f', titleColor: '#fff',
+            bodyColor: '#9db9a6', borderColor: '#28392e', borderWidth: 1,
+            callbacks: {
+                afterBody(ctx) {
+                    const v = values[ctx[0]?.dataIndex];
+                    if (v == null) return [];
+                    const t = THRESHOLDS[key];
+                    if (v < t.min) return [`⚠ ERROR: Too low (safe min ${t.min}${t.unit})`];
+                    if (v > t.max) return [`⚠ ERROR: Too high (safe max ${t.max}${t.unit})`];
+                    return [];
+                },
+                afterBodyColor() { return '#ef4444'; },
+            }
+        };
+    }
+
+    // Short x-axis tick formatter — format depends on selected time range
+    const xTickCb = function(val, index) {
+        const d = labels[index];
+        if (!d) return '';
+        const date = new Date(d);
+        if (selectedTimeRange === '24h' || selectedTimeRange === 'custom') {
+            // Hours only: "06:00"
+            const hr  = String(date.getHours()).padStart(2, '0');
+            const min = String(date.getMinutes()).padStart(2, '0');
+            return `${hr}:${min}`;
+        }
+        if (selectedTimeRange === '7d') {
+            // Weekday + day: "Mon 14"
+            const wd  = date.toLocaleDateString('en', { weekday: 'short' });
+            const day = date.getDate();
+            const hr  = String(date.getHours()).padStart(2, '0');
+            return `${wd} ${day}, ${hr}:00`;
+        }
+        // 30d / all / custom: "May 14"
+        const mon = date.toLocaleDateString('en', { month: 'short' });
+        const day = date.getDate();
+        return `${mon} ${day}`;
+    };
+    const xAxisOpts = {
+        grid: { color: '#28392e' },
+        ticks: { color: '#9db9a6', maxTicksLimit: 6, maxRotation: 0, callback: xTickCb }
+    };
 
     console.log('Chart data prepared - Labels:', labels.length, 'Soil values:', soilMoistureValues.length);
 
@@ -2818,59 +3242,23 @@ function generateCharts(data) {
         analyticsCharts.soilMoisture = new Chart(soilMoistureCtx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels,
                 datasets: [{
                     label: 'Soil Moisture (%)',
                     data: soilMoistureValues,
                     borderColor: '#4ade80',
-                    backgroundColor: 'rgba(74, 222, 128, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#4ade80'
+                    backgroundColor: 'rgba(74,222,128,0.1)',
+                    borderWidth: 2, fill: true, tension: 0.4, spanGaps: true,
+                    pointRadius: ptSizes('soilMoisture', soilMoistureValues),
+                    pointBackgroundColor: ptColors('soilMoisture', soilMoistureValues, '#4ade80'),
+                    pointBorderColor: ptBorderColors('soilMoisture', soilMoistureValues),
+                    pointBorderWidth: 2,
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: '#1c271f',
-                        titleColor: '#fff',
-                        bodyColor: '#9db9a6',
-                        borderColor: '#28392e',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            color: '#28392e'
-                        },
-                        ticks: {
-                            color: '#9db9a6'
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        grid: {
-                            color: '#28392e'
-                        },
-                        ticks: {
-                            color: '#9db9a6',
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        }
-                    }
-                }
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: makeTooltip('soilMoisture', soilMoistureValues) },
+                scales: { x: xAxisOpts, y: { beginAtZero: true, max: 100, grid: { color: '#28392e' }, ticks: { color: '#9db9a6', callback: v => v + '%' } } }
             }
         });
         console.log('Soil moisture chart created successfully');
@@ -2893,57 +3281,23 @@ function generateCharts(data) {
         analyticsCharts.temperature = new Chart(temperatureCtx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels,
                 datasets: [{
                     label: 'Temperature (°C)',
                     data: temperatureValues,
                     borderColor: '#fb923c',
-                    backgroundColor: 'rgba(251, 146, 60, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#fb923c'
+                    backgroundColor: 'rgba(251,146,60,0.1)',
+                    borderWidth: 2, fill: true, tension: 0.4, spanGaps: true,
+                    pointRadius: ptSizes('temperature', temperatureValues),
+                    pointBackgroundColor: ptColors('temperature', temperatureValues, '#fb923c'),
+                    pointBorderColor: ptBorderColors('temperature', temperatureValues),
+                    pointBorderWidth: 2,
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: '#1c271f',
-                        titleColor: '#fff',
-                        bodyColor: '#9db9a6',
-                        borderColor: '#28392e',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            color: '#28392e'
-                        },
-                        ticks: {
-                            color: '#9db9a6'
-                        }
-                    },
-                    y: {
-                        grid: {
-                            color: '#28392e'
-                        },
-                        ticks: {
-                            color: '#9db9a6',
-                            callback: function(value) {
-                                return value + '°C';
-                            }
-                        }
-                    }
-                }
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: makeTooltip('temperature', temperatureValues) },
+                scales: { x: xAxisOpts, y: { grid: { color: '#28392e' }, ticks: { color: '#9db9a6', callback: v => v + '°C' } } }
             }
         });
         console.log('Temperature chart created successfully');
@@ -2966,240 +3320,855 @@ function generateCharts(data) {
         analyticsCharts.waterLevel = new Chart(waterLevelCtx, {
             type: 'line',
             data: {
-                labels: labels,
+                labels,
                 datasets: [{
                     label: 'Water Level (%)',
                     data: waterLevelValues,
                     borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#3b82f6',
-                    spanGaps: true // This will connect the line across null values
+                    backgroundColor: 'rgba(59,130,246,0.1)',
+                    borderWidth: 2, fill: true, tension: 0.4, spanGaps: true,
+                    pointRadius: ptSizes('waterLevel', waterLevelValues),
+                    pointBackgroundColor: ptColors('waterLevel', waterLevelValues, '#3b82f6'),
+                    pointBorderColor: ptBorderColors('waterLevel', waterLevelValues),
+                    pointBorderWidth: 2,
                 }]
             },
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                        backgroundColor: '#1c271f',
-                        titleColor: '#fff',
-                        bodyColor: '#9db9a6',
-                        borderColor: '#28392e',
-                        borderWidth: 1
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            color: '#28392e'
-                        },
-                        ticks: {
-                            color: '#9db9a6'
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        grid: {
-                            color: '#28392e'
-                        },
-                        ticks: {
-                            color: '#9db9a6',
-                            callback: function(value) {
-                                return value + '%';
-                            }
-                        }
-                    }
-                }
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: makeTooltip('waterLevel', waterLevelValues) },
+                scales: { x: xAxisOpts, y: { beginAtZero: true, max: 100, grid: { color: '#28392e' }, ticks: { color: '#9db9a6', callback: v => v + '%' } } }
             }
         });
         console.log('Water level chart created successfully');
     } catch (error) {
         console.error('Error creating water level chart:', error);
     }
+
+    // Generate Humidity Chart
+    const humidityCtx = document.getElementById('humidity-chart');
+    if (humidityCtx) {
+        if (analyticsCharts.humidity) analyticsCharts.humidity.destroy();
+        try {
+            analyticsCharts.humidity = new Chart(humidityCtx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Humidity (%)',
+                        data: humidityValues,
+                        borderColor: '#2dd4bf',
+                        backgroundColor: 'rgba(45,212,191,0.1)',
+                        borderWidth: 2, fill: true, tension: 0.4, spanGaps: true,
+                        pointRadius: ptSizes('humidity', humidityValues),
+                        pointBackgroundColor: ptColors('humidity', humidityValues, '#2dd4bf'),
+                        pointBorderColor: ptBorderColors('humidity', humidityValues),
+                        pointBorderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: makeTooltip('humidity', humidityValues) },
+                    scales: { x: xAxisOpts, y: { beginAtZero: true, max: 100, grid: { color: '#28392e' }, ticks: { color: '#9db9a6', callback: v => v + '%' } } }
+                }
+            });
+        } catch (e) { console.error('Error creating humidity chart:', e); }
+    }
+
+    // Generate pH Chart
+    const phCtx = document.getElementById('ph-chart');
+    if (phCtx) {
+        if (analyticsCharts.ph) analyticsCharts.ph.destroy();
+        try {
+            analyticsCharts.ph = new Chart(phCtx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'pH Level',
+                        data: phValues,
+                        borderColor: '#c084fc',
+                        backgroundColor: 'rgba(192,132,252,0.1)',
+                        borderWidth: 2, fill: true, tension: 0.4, spanGaps: true,
+                        pointRadius: ptSizes('ph', phValues),
+                        pointBackgroundColor: ptColors('ph', phValues, '#c084fc'),
+                        pointBorderColor: ptBorderColors('ph', phValues),
+                        pointBorderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: makeTooltip('ph', phValues) },
+                    scales: { x: xAxisOpts, y: { min: 0, max: 14, grid: { color: '#28392e' }, ticks: { color: '#9db9a6', callback: v => v + ' pH' } } }
+                }
+            });
+        } catch (e) { console.error('Error creating pH chart:', e); }
+    }
 }
 
-// Export Report
+// Export Report as PDF
 document.getElementById('export-report-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('export-report-btn');
+    const originalHTML = btn.innerHTML;
+
     try {
-        const btn = document.getElementById('export-report-btn');
-        const originalHTML = btn.innerHTML;
         btn.disabled = true;
-        btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">hourglass_empty</span><span class="font-medium">Exporting...</span>';
+        btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">hourglass_empty</span><span class="font-medium">Generating PDF...</span>';
 
-        // Get current analytics data
-        let deviceIds = [];
-
-        if (selectedCropId) {
-            const cropDoc = await db.collection('crops').doc(selectedCropId).get();
-            if (cropDoc.exists) {
-                const cropData = cropDoc.data();
-                if (cropData.device_id) {
-                    deviceIds.push(cropData.device_id);
-                }
-            }
-        } else if (selectedFarmId) {
-            const cropsSnapshot = await db.collection('crops')
-                .where('farmer_id', '==', selectedFarmId)
-                .get();
-
-            cropsSnapshot.forEach(doc => {
-                const cropData = doc.data();
-                if (cropData.device_id) {
-                    deviceIds.push(cropData.device_id);
-                }
-            });
-        } else {
-            const cropsSnapshot = await db.collection('crops').get();
-            cropsSnapshot.forEach(doc => {
-                const cropData = doc.data();
-                if (cropData.device_id) {
-                    deviceIds.push(cropData.device_id);
-                }
-            });
+        if (!window.jspdf) {
+            throw new Error('PDF library not loaded. Please refresh the page and try again.');
         }
 
-        deviceIds = [...new Set(deviceIds)];
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-        if (deviceIds.length === 0) {
-            alert('No device data found to export');
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-            return;
-        }
+        const pageW = 210;
+        const pageH = 297;
+        const margin = 15;
+        const contentW = pageW - margin * 2;
 
-        // Calculate time range (last 7 days) - Firebase RTDB stores timestamps in SECONDS
-        const endTime = Math.floor(Date.now() / 1000);
-        const startTime = endTime - (7 * 24 * 60 * 60);
+        // Color helpers
+        const C = {
+            green:   [43, 238, 108],
+            darkBg:  [16, 34, 22],
+            surface: [28, 39, 31],
+            surface2:[35, 53, 41],
+            muted:   [157, 185, 166],
+            white:   [255, 255, 255],
+            soil:    [74, 222, 128],
+            temp:    [251, 146, 60],
+            ph:      [192, 132, 252],
+            water:   [96, 165, 250],
+        };
 
-        // Fetch historical sensor data
-        const allSensorData = [];
-        for (const deviceId of deviceIds) {
-            try {
-                // Fetch soil moisture history
-                const soilSnapshot = await rtdb.ref(`sensors/${deviceId}/history/soil`)
-                    .orderByKey()
-                    .startAt(startTime.toString())
-                    .endAt(endTime.toString())
-                    .once('value');
+        // ── HEADER (0..30mm) ──────────────────────────────────────────
+        doc.setFillColor(...C.darkBg);
+        doc.rect(0, 0, pageW, 30, 'F');
 
-                const soilData = soilSnapshot.val() || {};
+        // Green left accent
+        doc.setFillColor(...C.green);
+        doc.rect(0, 0, 4, 30, 'F');
 
-                // Fetch temperature history
-                const tempSnapshot = await rtdb.ref(`sensors/${deviceId}/history/temp`)
-                    .orderByKey()
-                    .startAt(startTime.toString())
-                    .endAt(endTime.toString())
-                    .once('value');
+        // Logo text
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.green);
+        doc.text('AgroEzuran', margin + 4, 13);
 
-                const tempData = tempSnapshot.val() || {};
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...C.muted);
+        doc.text('Smart Farm Management System  ·  Admin Analytics Report', margin + 4, 22);
 
-                // Fetch humidity history
-                const humiditySnapshot = await rtdb.ref(`sensors/${deviceId}/history/humidity`)
-                    .orderByKey()
-                    .startAt(startTime.toString())
-                    .endAt(endTime.toString())
-                    .once('value');
+        // Generated info (right)
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' });
+        const adminName = document.getElementById('admin-name-text')?.textContent || 'Admin';
 
-                const humidityData = humiditySnapshot.val() || {};
+        doc.setFontSize(7.5);
+        doc.setTextColor(...C.muted);
+        doc.text(`Generated: ${dateStr}, ${timeStr}`, pageW - margin, 13, { align: 'right' });
+        doc.text(`By: ${adminName}`, pageW - margin, 21, { align: 'right' });
 
-                // Fetch pH history
-                const phSnapshot = await rtdb.ref(`sensors/${deviceId}/history/ph`)
-                    .orderByKey()
-                    .startAt(startTime.toString())
-                    .endAt(endTime.toString())
-                    .once('value');
+        let y = 36;
 
-                const phData = phSnapshot.val() || {};
+        // ── FILTER INFO (y..y+18) ─────────────────────────────────────
+        const farmSelect = document.getElementById('analytics-farm-filter');
+        const cropSelect = document.getElementById('analytics-crop-filter');
+        const farmLabel = farmSelect?.options[farmSelect.selectedIndex]?.text || 'All Farms';
+        const cropLabel = cropSelect && cropSelect.options.length > 0
+            ? cropSelect.options[cropSelect.selectedIndex]?.text || 'All Crops'
+            : 'All Crops';
+        const timeLabel = selectedTimeRange === '24h' ? 'Last 24 Hours'
+                        : selectedTimeRange === '7d' ? 'Last 7 Days'
+                        : selectedTimeRange === '30d' ? 'Last 30 Days'
+                        : 'All Time';
 
-                // Fetch water level history
-                const waterSnapshot = await rtdb.ref(`sensors/${deviceId}/history/waterLevel`)
-                    .orderByKey()
-                    .startAt(startTime.toString())
-                    .endAt(endTime.toString())
-                    .once('value');
+        doc.setFillColor(...C.surface);
+        doc.roundedRect(margin, y, contentW, 20, 2, 2, 'F');
 
-                const waterData = waterSnapshot.val() || {};
+        const col = contentW / 3;
+        const filterFields = [
+            { label: 'FARM', value: farmLabel },
+            { label: 'CROP', value: cropLabel },
+            { label: 'TIME RANGE', value: timeLabel },
+        ];
+        filterFields.forEach((f, i) => {
+            const fx = margin + 6 + i * col;
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...C.muted);
+            doc.text(f.label, fx, y + 8);
 
-                // Combine all timestamps
-                const allTimestamps = new Set([
-                    ...Object.keys(soilData),
-                    ...Object.keys(tempData),
-                    ...Object.keys(humidityData),
-                    ...Object.keys(phData),
-                    ...Object.keys(waterData)
-                ]);
+            doc.setFontSize(9);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.white);
+            doc.text(f.value, fx, y + 16);
+        });
+        doc.setFont('helvetica', 'normal');
 
-                // Create combined data rows
-                allTimestamps.forEach(timestamp => {
-                    allSensorData.push({
-                        deviceId,
-                        timestamp: parseInt(timestamp),
-                        soilMoisture: soilData[timestamp] || null,
-                        temperature: tempData[timestamp] || null,
-                        humidity: humidityData[timestamp] || null,
-                        ph: phData[timestamp] || null,
-                        waterLevel: waterData[timestamp] || null
-                    });
-                });
+        y += 26;
 
-            } catch (error) {
-                console.error(`Error loading device ${deviceId}:`, error);
-            }
-        }
+        // ── STATS CARDS (y..y+28) ─────────────────────────────────────
+        const avgSoil  = document.getElementById('avg-soil-moisture')?.textContent || '--';
+        const avgTemp  = document.getElementById('avg-temperature')?.textContent || '--';
+        const avgPh    = document.getElementById('avg-ph')?.textContent || '--';
+        const soilChg  = document.getElementById('soil-moisture-change')?.textContent || '';
+        const tempChg  = document.getElementById('temperature-change')?.textContent || '';
+        const phStat   = document.getElementById('ph-status')?.textContent || '';
 
-        if (allSensorData.length === 0) {
-            alert('No historical data found for the selected period');
-            btn.disabled = false;
-            btn.innerHTML = originalHTML;
-            return;
-        }
+        const statCards = [
+            { label: 'AVG SOIL MOISTURE', value: avgSoil, sub: soilChg, accent: C.soil },
+            { label: 'AVG TEMPERATURE',   value: avgTemp,  sub: tempChg, accent: C.temp },
+            { label: 'pH LEVEL',          value: avgPh,    sub: phStat,  accent: C.ph   },
+        ];
 
-        // Sort by timestamp
-        allSensorData.sort((a, b) => a.timestamp - b.timestamp);
+        const cardW = (contentW - 6) / 3;
+        statCards.forEach((card, i) => {
+            const cx = margin + i * (cardW + 3);
 
-        // Generate CSV
-        let csv = 'Device ID,Timestamp,Date/Time,Soil Moisture (%),Temperature (°C),Humidity (%),pH,Water Level (%)\n';
+            doc.setFillColor(...C.surface);
+            doc.roundedRect(cx, y, cardW, 30, 2, 2, 'F');
 
-        allSensorData.forEach(data => {
-            // Convert Unix timestamp (seconds) to milliseconds for Date object
-            const date = new Date(data.timestamp * 1000).toISOString().replace('T', ' ').split('.')[0];
-            csv += `${data.deviceId},${data.timestamp},${date},${data.soilMoisture !== null ? data.soilMoisture : 'N/A'},${data.temperature !== null ? data.temperature : 'N/A'},${data.humidity !== null ? data.humidity : 'N/A'},${data.ph !== null ? data.ph : 'N/A'},${data.waterLevel !== null ? data.waterLevel : 'N/A'}\n`;
+            // Colored top bar
+            doc.setFillColor(...card.accent);
+            doc.roundedRect(cx, y, cardW, 2.5, 1, 1, 'F');
+
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...C.muted);
+            doc.text(card.label, cx + cardW / 2, y + 10, { align: 'center' });
+
+            doc.setFontSize(15);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.white);
+            doc.text(card.value, cx + cardW / 2, y + 21, { align: 'center' });
+
+            doc.setFontSize(7.5);
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(...card.accent);
+            doc.text(card.sub, cx + cardW / 2, y + 28, { align: 'center' });
         });
 
-        // Download CSV
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const dateStr = new Date().toISOString().split('T')[0];
-        const farmFilter = selectedFarmId ? '-farm-' + selectedFarmId.substring(0, 8) : '';
-        const cropFilter = selectedCropId ? '-crop-' + selectedCropId.substring(0, 8) : '';
-        a.download = `smart-farm-analytics${farmFilter}${cropFilter}-${dateStr}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
+        y += 38;
+
+        // ── SENSOR CHARTS ─────────────────────────────────────────────
+        const chartConfigs = [
+            { id: 'soil-moisture-chart', label: 'Soil Moisture Trend (%)', accent: C.soil },
+            { id: 'temperature-chart',   label: 'Temperature Trend (°C)',  accent: C.temp },
+            { id: 'water-level-chart',   label: 'Water Level Trend (%)',   accent: C.water },
+        ];
+
+        const containerH = 53; // total height of each chart box
+        const chartImgH  = 41; // height of the chart image inside the box
+
+        for (const chartCfg of chartConfigs) {
+            // Page break if needed (leave 15mm for footer)
+            if (y + containerH > pageH - 18) {
+                doc.addPage();
+                y = 15;
+            }
+
+            doc.setFillColor(...C.surface);
+            doc.roundedRect(margin, y, contentW, containerH, 2, 2, 'F');
+
+            // Left accent bar
+            doc.setFillColor(...chartCfg.accent);
+            doc.roundedRect(margin, y, 3, containerH, 1, 1, 'F');
+
+            // Chart label
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.white);
+            doc.text(chartCfg.label, margin + 8, y + 9);
+            doc.setFont('helvetica', 'normal');
+
+            // Embed chart image from canvas
+            const canvas = document.getElementById(chartCfg.id);
+            if (canvas) {
+                try {
+                    const imgData = canvas.toDataURL('image/png');
+                    doc.addImage(imgData, 'PNG', margin + 4, y + 11, contentW - 8, chartImgH);
+                } catch (e) {
+                    doc.setFontSize(8);
+                    doc.setTextColor(...C.muted);
+                    doc.text('No chart data available', margin + contentW / 2, y + containerH / 2 + 5, { align: 'center' });
+                }
+            }
+
+            y += containerH + 5;
+        }
+
+        // ── FOOTER ────────────────────────────────────────────────────
+        const lastPage = doc.internal.getNumberOfPages();
+        for (let p = 1; p <= lastPage; p++) {
+            doc.setPage(p);
+            doc.setFillColor(...C.darkBg);
+            doc.rect(0, pageH - 12, pageW, 12, 'F');
+
+            doc.setFillColor(...C.green);
+            doc.rect(0, pageH - 12, pageW, 1.2, 'F');
+
+            doc.setFontSize(7);
+            doc.setTextColor(...C.muted);
+            doc.text('AgroEzuran Admin Dashboard  ·  Confidential', margin, pageH - 4.5);
+            doc.text(`Page ${p} of ${lastPage}`, pageW - margin, pageH - 4.5, { align: 'right' });
+        }
+
+        // ── SAVE ──────────────────────────────────────────────────────
+        const fileDateStr = now.toISOString().split('T')[0];
+        doc.save(`AgroEzuran-Admin-Report-${fileDateStr}.pdf`);
 
         btn.disabled = false;
         btn.innerHTML = originalHTML;
-        alert(`Report exported successfully! ${allSensorData.length} data points exported.`);
+
     } catch (error) {
-        console.error('Error exporting report:', error);
-        const btn = document.getElementById('export-report-btn');
+        console.error('Error generating PDF:', error);
         btn.disabled = false;
-        btn.innerHTML = '<span class="material-symbols-outlined text-[20px]">download</span><span class="font-medium">Export Report</span>';
-        alert('Failed to export report: ' + error.message);
+        btn.innerHTML = originalHTML;
+        alert('Failed to generate PDF: ' + error.message);
     }
 });
+
+// ─────────────────────────────────────────────────────────────
+// DEVICE INVENTORY
+// ─────────────────────────────────────────────────────────────
+
+let devicesUnsubscribe = null;
+let currentDeviceStatusFilter = '';
+
+async function loadDevicesPage() {
+    if (devicesUnsubscribe) devicesUnsubscribe();
+    currentDeviceStatusFilter = '';
+
+    // Wire status filter
+    document.getElementById('device-status-filter').onchange = (e) => {
+        currentDeviceStatusFilter = e.target.value;
+        renderDevices();
+    };
+
+    // Wire generate code modal
+    document.getElementById('generate-code-btn').onclick = () => {
+        document.getElementById('generated-code-display').classList.add('hidden');
+        document.getElementById('gen-quantity').value = 1;
+        document.getElementById('gen-notes').value = '';
+        document.getElementById('generate-code-modal').classList.remove('hidden');
+    };
+    document.getElementById('close-generate-modal').onclick = () => {
+        document.getElementById('generate-code-modal').classList.add('hidden');
+    };
+    document.getElementById('confirm-generate-btn').onclick = handleGenerateCodes;
+
+    // Real-time listener on devices collection
+    devicesUnsubscribe = db.collection('devices')
+        .orderBy('created_at', 'desc')
+        .onSnapshot(async (snap) => {
+            const devices = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // For claimed devices missing farmer_name, look it up from crops collection
+            const needsLookup = devices.filter(d => d.status === 'claimed' && !d.farmer_name);
+            if (needsLookup.length > 0) {
+                try {
+                    const cropsSnap = await db.collection('crops')
+                        .where('status', '==', 'active')
+                        .get();
+                    const cropsByDevice = {};
+                    cropsSnap.docs.forEach(c => {
+                        const data = c.data();
+                        if (data.device_id) cropsByDevice[data.device_id] = data;
+                    });
+
+                    // Also fetch user names from users collection for matched crops
+                    const farmerUids = [...new Set(
+                        Object.values(cropsByDevice).map(c => c.farmer_id).filter(Boolean)
+                    )];
+                    const userNames = {};
+                    for (const uid of farmerUids) {
+                        try {
+                            const uSnap = await db.collection('users').where('uid', '==', uid).limit(1).get();
+                            if (!uSnap.empty) {
+                                const u = uSnap.docs[0].data();
+                                userNames[uid] = u.name || u.displayName || uid;
+                            }
+                        } catch (_) {}
+                    }
+
+                    needsLookup.forEach(dev => {
+                        const crop = cropsByDevice[dev.id];
+                        if (crop) {
+                            dev.farmer_name = userNames[crop.farmer_id] || crop.farmer_id || '—';
+                            dev.claimed_at = dev.claimed_at || crop.createdAt || null;
+                        }
+                    });
+                } catch (e) {
+                    console.warn('Could not enrich device farmer data:', e);
+                }
+            }
+
+            window._allDevices = devices;
+            renderDevices();
+        }, (err) => {
+            console.error('Devices listener error:', err);
+        });
+}
+
+let _allDevices = [];
+
+function renderDevices() {
+    const devices = window._allDevices || [];
+    const filtered = currentDeviceStatusFilter
+        ? devices.filter(d => d.status === currentDeviceStatusFilter)
+        : devices;
+
+    // Update stats
+    document.getElementById('dev-total').textContent = devices.length;
+    document.getElementById('dev-available').textContent = devices.filter(d => d.status === 'available').length;
+    document.getElementById('dev-claimed').textContent = devices.filter(d => d.status === 'claimed').length;
+    document.getElementById('dev-inactive').textContent = devices.filter(d => d.status === 'inactive').length;
+
+    const tbody = document.getElementById('devices-tbody');
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-[#9db9a6]">No devices found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(dev => {
+        const statusColors = {
+            available:  'bg-primary/10 text-primary',
+            claimed:    'bg-blue-400/10 text-blue-400',
+            inactive:   'bg-red-400/10 text-red-400',
+        };
+        const statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${statusColors[dev.status] || 'bg-[#28392e] text-[#9db9a6]'}">${dev.status || 'unknown'}</span>`;
+        const claimedBy = dev.farmer_name ? `<span class="text-white">${dev.farmer_name}</span>` : '<span class="text-[#9db9a6]">—</span>';
+        const claimedDate = dev.claimed_at ? formatDate(dev.claimed_at.toDate ? dev.claimed_at.toDate() : new Date(dev.claimed_at)) : '<span class="text-[#9db9a6]">—</span>';
+        const notes = dev.notes ? `<span class="text-[#9db9a6] text-xs">${dev.notes}</span>` : '<span class="text-[#9db9a6]">—</span>';
+
+        return `<tr class="hover:bg-[#223026] transition-colors">
+            <td class="p-4">
+                <span class="font-mono text-primary font-semibold tracking-wider">${dev.unique_code || dev.id}</span>
+            </td>
+            <td class="p-4">${statusBadge}</td>
+            <td class="p-4">${claimedBy}</td>
+            <td class="p-4 text-[#9db9a6] text-sm">${claimedDate}</td>
+            <td class="p-4">${notes}</td>
+            <td class="p-4 text-right">
+                <button onclick="toggleDeviceStatus('${dev.id}', '${dev.status}')"
+                    class="px-3 py-1.5 text-xs rounded-lg border border-[#3b5443] text-[#9db9a6] hover:text-white hover:border-[#9db9a6] transition-colors">
+                    ${dev.status === 'inactive' ? 'Reactivate' : 'Deactivate'}
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+async function handleGenerateCodes() {
+    const quantity = parseInt(document.getElementById('gen-quantity').value) || 1;
+    const notes = document.getElementById('gen-notes').value.trim();
+    const btn = document.getElementById('confirm-generate-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+        const codes = [];
+        const batch = db.batch();
+        for (let i = 0; i < Math.min(quantity, 50); i++) {
+            const code = generateUniqueDeviceCode();
+            codes.push(code);
+            const ref = db.collection('devices').doc();
+            batch.set(ref, {
+                unique_code: code,
+                status: 'available',
+                created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                notes: notes || null,
+                claimed_at: null,
+                claimed_by: null,
+                farmer_name: null,
+            });
+        }
+        await batch.commit();
+
+        document.getElementById('generated-code-display').classList.remove('hidden');
+        document.getElementById('generated-code-value').textContent = codes.length === 1 ? codes[0] : `${codes.length} codes generated`;
+        btn.textContent = 'Generate More';
+    } catch (err) {
+        console.error('Generate error:', err);
+        alert('Failed to generate codes: ' + err.message);
+        btn.textContent = 'Generate';
+    }
+    btn.disabled = false;
+}
+
+function generateUniqueDeviceCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const part = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    return `AGR-${part(4)}-${part(4)}`;
+}
+
+async function toggleDeviceStatus(deviceId, currentStatus) {
+    const newStatus = currentStatus === 'inactive' ? 'available' : 'inactive';
+    try {
+        await db.collection('devices').doc(deviceId).update({ status: newStatus });
+    } catch (err) {
+        alert('Failed to update device: ' + err.message);
+    }
+}
+
+function formatDate(date) {
+    if (!date) return '—';
+    return date.toLocaleDateString('en-MY', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// ─────────────────────────────────────────────────────────────
+// SUPPORT TICKETS
+// ─────────────────────────────────────────────────────────────
+
+let supportUnsubscribe = null;
+let chatMessagesUnsubscribe = null;
+let currentTicketId = null;
+let currentSupportFilter = '';
+let currentSupportSearch = '';
+let _allSupportDocs = [];
+let _deviceCodeCache = {}; // deviceId (doc ID) → unique_code
+
+async function _ensureDeviceCodes(deviceIds) {
+    const missing = [...new Set(deviceIds)].filter(id => id && _deviceCodeCache[id] === undefined);
+    if (!missing.length) return;
+    // Firestore 'in' supports up to 10 items
+    for (let i = 0; i < missing.length; i += 10) {
+        const batch = missing.slice(i, i + 10);
+        try {
+            const snap = await db.collection('devices')
+                .where(firebase.firestore.FieldPath.documentId(), 'in', batch)
+                .get();
+            snap.docs.forEach(doc => {
+                _deviceCodeCache[doc.id] = doc.data().unique_code || null;
+            });
+        } catch (_) {}
+        // Mark unfound ids so we don't re-query them
+        batch.forEach(id => { if (_deviceCodeCache[id] === undefined) _deviceCodeCache[id] = null; });
+    }
+}
+
+async function loadSupportPage() {
+    if (supportUnsubscribe) supportUnsubscribe();
+    currentSupportFilter = '';
+    currentSupportSearch = '';
+    currentTicketId = null;
+
+    // Wire tab filter buttons
+    document.querySelectorAll('.support-tab').forEach(tab => {
+        tab.onclick = () => {
+            document.querySelectorAll('.support-tab').forEach(t => {
+                t.classList.remove('text-white', 'bg-[#28392e]');
+                t.classList.add('text-[#9db9a6]');
+            });
+            tab.classList.add('text-white', 'bg-[#28392e]');
+            tab.classList.remove('text-[#9db9a6]');
+            currentSupportFilter = tab.getAttribute('data-status');
+            renderTicketList();
+        };
+    });
+
+    // Wire search input
+    const searchInput = document.getElementById('ticket-search');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.oninput = () => {
+            currentSupportSearch = searchInput.value.trim().toLowerCase();
+            renderTicketList();
+        };
+    }
+
+    // Wire send reply
+    document.getElementById('send-reply-btn').onclick = sendAdminReply;
+    document.getElementById('admin-reply-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAdminReply(); }
+    });
+
+    // Wire status buttons
+    document.getElementById('resolve-btn').onclick = () => updateTicketStatus(currentTicketId, 'resolved');
+    document.getElementById('reopen-btn').onclick = () => updateTicketStatus(currentTicketId, 'open');
+
+    loadTicketList();
+}
+
+function loadTicketList() {
+    if (supportUnsubscribe) supportUnsubscribe();
+
+    // Fetch all tickets real-time, filter client-side
+    supportUnsubscribe = db.collection('support_tickets')
+        .orderBy('updated_at', 'desc')
+        .onSnapshot((snap) => {
+            _allSupportDocs = snap.docs;
+            renderTicketList();
+        }, err => console.error('Support listener error:', err));
+}
+
+async function renderTicketList() {
+    const list = document.getElementById('ticket-list');
+    const docs = _allSupportDocs;
+
+    // Pre-fetch unique_code for all device IDs in one batch
+    await _ensureDeviceCodes(docs.map(d => d.data().device_id).filter(Boolean));
+
+    // --- Stats counts ---
+    const cOpen     = docs.filter(d => d.data().status === 'open').length;
+    const cActive   = docs.filter(d => d.data().status === 'in_progress').length;
+    const cResolved = docs.filter(d => d.data().status === 'resolved').length;
+    const cTotal    = docs.length;
+    const cNavOpen  = cOpen + cActive;
+
+    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setEl('sup-count-open',     cOpen);
+    setEl('sup-count-active',   cActive);
+    setEl('sup-count-resolved', cResolved);
+    setEl('sup-total-badge',    `${cTotal} total`);
+
+    // Nav badge
+    const navLabel = document.getElementById('support-nav-label');
+    if (navLabel) navLabel.textContent = cNavOpen > 0 ? `Support (${cNavOpen})` : 'Support';
+
+    // --- Filter + search ---
+    let filtered = currentSupportFilter
+        ? docs.filter(d => d.data().status === currentSupportFilter)
+        : docs;
+
+    if (currentSupportSearch) {
+        filtered = filtered.filter(d => {
+            const t = d.data();
+            return (t.subject || '').toLowerCase().includes(currentSupportSearch)
+                || (t.farmer_name || '').toLowerCase().includes(currentSupportSearch)
+                || (t.device_id || '').toLowerCase().includes(currentSupportSearch);
+        });
+    }
+
+    if (filtered.length === 0) {
+        list.innerHTML = `<div class="flex flex-col items-center justify-center gap-2 py-12 px-4 text-center">
+            <span class="material-icons text-3xl text-[#3b5443]">inbox</span>
+            <p class="text-[#9db9a6] text-sm">${currentSupportSearch ? 'No matching tickets' : 'No tickets here'}</p>
+        </div>`;
+        return;
+    }
+
+    // --- Status helpers ---
+    const statusBorderColor = s => s === 'open' ? 'border-primary' : s === 'in_progress' ? 'border-orange-400' : 'border-[#3b5443]';
+    const statusDotColor    = s => s === 'open' ? 'bg-primary' : s === 'in_progress' ? 'bg-orange-400' : 'bg-[#3b5443]';
+    const statusLabel       = s => s === 'open' ? 'Open' : s === 'in_progress' ? 'In Progress' : 'Resolved';
+    const statusTextColor   = s => s === 'open' ? 'text-primary' : s === 'in_progress' ? 'text-orange-400' : 'text-[#9db9a6]';
+
+    const timeAgo = (date) => {
+        if (!date) return '';
+        const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+        if (diff < 60)   return 'just now';
+        if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+        return `${Math.floor(diff / 86400)}d ago`;
+    };
+
+    const initials = (name) => {
+        if (!name) return '?';
+        return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    };
+
+    list.innerHTML = filtered.map(doc => {
+        const t = doc.data();
+        const isActive = doc.id === currentTicketId;
+        const border   = statusBorderColor(t.status);
+        const dot      = statusDotColor(t.status);
+        const label    = statusLabel(t.status);
+        const txtColor = statusTextColor(t.status);
+        const updAt    = t.updated_at ? (t.updated_at.toDate ? t.updated_at.toDate() : new Date(t.updated_at)) : null;
+        const ago      = timeAgo(updAt);
+        const avatar   = initials(t.farmer_name);
+        const unreadBadge = t.unread_admin > 0
+            ? `<span class="flex-shrink-0 min-w-[20px] h-5 px-1 bg-primary rounded-full text-[#111813] text-[10px] font-bold flex items-center justify-center animate-pulse">${t.unread_admin}</span>`
+            : '';
+
+        return `<div class="ticket-item relative flex items-start gap-3 px-4 py-3 cursor-pointer border-l-4 ${border}
+                    hover:bg-[#1a2a1f] transition-colors ${isActive ? 'bg-[#1e2f23]' : ''}"
+                    onclick="openTicket('${doc.id}')">
+            <div class="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                 style="background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.25)">${avatar}</div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between gap-1">
+                    <p class="text-white text-sm font-semibold truncate flex-1">${t.subject || 'No subject'}</p>
+                    ${unreadBadge}
+                </div>
+                <p class="text-[#9db9a6] text-xs mt-0.5 truncate">${t.farmer_name || 'Unknown'} · ${_deviceCodeCache[t.device_id] || t.device_code || t.device_id || '—'}</p>
+                <div class="flex items-center gap-2 mt-1.5">
+                    <span class="flex items-center gap-1 text-xs font-medium ${txtColor}">
+                        <span class="w-1.5 h-1.5 rounded-full ${dot} inline-block"></span>${label}
+                    </span>
+                    <span class="text-[#9db9a6] text-xs ml-auto">${ago}</span>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function openTicket(ticketId) {
+    currentTicketId = ticketId;
+
+    // Highlight selected — re-render list so isActive flag updates
+    renderTicketList();
+
+    // Show active chat panel
+    document.getElementById('chat-empty-state').classList.add('hidden');
+    const chatActive = document.getElementById('chat-active');
+    chatActive.classList.remove('hidden');
+    chatActive.classList.add('flex');
+
+    // Load ticket metadata
+    const ticketDoc = await db.collection('support_tickets').doc(ticketId).get();
+    if (!ticketDoc.exists) return;
+    const ticket = ticketDoc.data();
+
+    document.getElementById('chat-subject').textContent = ticket.subject || 'Support Ticket';
+    document.getElementById('chat-meta').textContent = `${ticket.farmer_name || 'Farmer'} · Device: ${ticket.device_id || '—'} · ${ticket.device_code || ''}`;
+
+    // Populate farmer avatar initials
+    const avatarEl = document.getElementById('chat-avatar');
+    if (avatarEl) {
+        const name = ticket.farmer_name || '';
+        const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
+        avatarEl.textContent = initials;
+    }
+
+    updateChatStatusUI(ticket.status);
+
+    // Mark admin unread as 0
+    db.collection('support_tickets').doc(ticketId).update({ unread_admin: 0 }).catch(() => {});
+
+    // Real-time messages
+    if (chatMessagesUnsubscribe) chatMessagesUnsubscribe();
+    chatMessagesUnsubscribe = db.collection('support_tickets').doc(ticketId)
+        .collection('messages')
+        .orderBy('sent_at', 'asc')
+        .onSnapshot((snap) => {
+            renderMessages(snap.docs);
+        });
+}
+
+function updateChatStatusUI(status) {
+    const badge = document.getElementById('chat-status-badge');
+    const resolveBtn = document.getElementById('resolve-btn');
+    const reopenBtn = document.getElementById('reopen-btn');
+    const resolvedBar = document.getElementById('resolved-bar');
+    const inputArea = document.getElementById('chat-input-area');
+
+    const badgeStyles = {
+        open:        'bg-primary/10 text-primary',
+        in_progress: 'bg-orange-400/10 text-orange-400',
+        resolved:    'bg-[#28392e] text-[#9db9a6]',
+    };
+    badge.className = `px-2.5 py-1 rounded-full text-xs font-semibold ${badgeStyles[status] || badgeStyles.open}`;
+    badge.textContent = status === 'open' ? 'Open' : status === 'in_progress' ? 'In Progress' : 'Resolved';
+
+    if (status === 'resolved') {
+        resolveBtn.classList.add('hidden');
+        reopenBtn.classList.remove('hidden');
+        resolvedBar.classList.remove('hidden');
+        inputArea.classList.add('hidden');
+    } else {
+        resolveBtn.classList.remove('hidden');
+        reopenBtn.classList.add('hidden');
+        resolvedBar.classList.add('hidden');
+        inputArea.classList.remove('hidden');
+    }
+}
+
+function renderMessages(docs) {
+    const container = document.getElementById('chat-messages');
+    if (docs.length === 0) {
+        container.innerHTML = '<div class="text-center text-[#9db9a6] text-sm py-8">No messages yet</div>';
+        return;
+    }
+
+    container.innerHTML = docs.map((doc, i) => {
+        const m = doc.data();
+        const isAdmin = m.sender_role === 'admin';
+        const isFarmer = m.sender_role === 'farmer';
+        const time = m.sent_at ? (m.sent_at.toDate ? m.sent_at.toDate() : new Date(m.sent_at)).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }) : '';
+        const showName = i === 0 || docs[i - 1].data().sender_role !== m.sender_role;
+
+        if (isAdmin) {
+            return `<div class="flex flex-col items-end gap-1">
+                ${showName ? `<span class="text-xs text-[#9db9a6] mr-1">${m.sender_name || 'Admin'}</span>` : ''}
+                <div class="max-w-xs lg:max-w-sm bg-primary/15 border border-primary/30 rounded-2xl rounded-tr-sm px-4 py-2.5">
+                    <p class="text-white text-sm">${escapeHtml(m.text)}</p>
+                </div>
+                <span class="text-[#9db9a6] text-xs mr-1">${time}</span>
+            </div>`;
+        } else {
+            return `<div class="flex flex-col items-start gap-1">
+                ${showName ? `<span class="text-xs text-[#9db9a6] ml-1">${m.sender_name || 'Farmer'}</span>` : ''}
+                <div class="max-w-xs lg:max-w-sm bg-[#28392e] border border-[#3b5443] rounded-2xl rounded-tl-sm px-4 py-2.5">
+                    <p class="text-white text-sm">${escapeHtml(m.text)}</p>
+                </div>
+                <span class="text-[#9db9a6] text-xs ml-1">${time}</span>
+            </div>`;
+        }
+    }).join('');
+
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+async function sendAdminReply() {
+    if (!currentTicketId) return;
+    const input = document.getElementById('admin-reply-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    const adminName = document.getElementById('admin-name-text')?.textContent || 'Admin';
+    input.value = '';
+    input.disabled = true;
+
+    try {
+        const msgRef = db.collection('support_tickets').doc(currentTicketId).collection('messages').doc();
+        await msgRef.set({
+            sender_uid:  currentUser.uid,
+            sender_name: adminName,
+            sender_role: 'admin',
+            text:        text,
+            sent_at:     firebase.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Update ticket — set in_progress if currently open, increment unread for farmer
+        await db.collection('support_tickets').doc(currentTicketId).update({
+            status:       'in_progress',
+            updated_at:   firebase.firestore.FieldValue.serverTimestamp(),
+            unread_farmer: firebase.firestore.FieldValue.increment(1),
+            unread_admin:  0,
+        });
+    } catch (err) {
+        console.error('Send reply error:', err);
+        alert('Failed to send reply: ' + err.message);
+    }
+    input.disabled = false;
+    input.focus();
+}
+
+async function updateTicketStatus(ticketId, status) {
+    if (!ticketId) return;
+    try {
+        await db.collection('support_tickets').doc(ticketId).update({
+            status:     status,
+            updated_at: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        updateChatStatusUI(status);
+    } catch (err) {
+        alert('Failed to update status: ' + err.message);
+    }
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/\n/g, '<br>');
+}
 
 console.log('App initialized');
