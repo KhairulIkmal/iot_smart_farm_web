@@ -13,7 +13,8 @@ import Sidebar from '../components/Sidebar'
 import SensorCard from '../components/SensorCard'
 import PumpControl from '../components/PumpControl'
 import AiChat from '../components/AiChat'
-import { AppPromoCard, AppPromoHint, AnalyticsPromoPage } from '../components/AppPromo'
+import { AppPromoCard, AppPromoHint } from '../components/AppPromo'
+import Analytics from '../components/Analytics'
 
 const SENSOR_ICONS = {
   temp: Thermometer,
@@ -226,7 +227,13 @@ export default function Dashboard() {
         )
 
       case 'analytics':
-        return <AnalyticsPromoPage />
+        return (
+          <Analytics
+            deviceId={deviceId}
+            userData={userData}
+            firebaseUser={firebaseUser}
+          />
+        )
 
       case 'irrigation':
         return (
