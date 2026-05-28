@@ -10,7 +10,8 @@ import {
 import { ref, get } from 'firebase/database'
 import { db, rtdb } from '../firebase'
 import { useSensorHistory } from '../hooks/useSensorHistory'
-import { Droplets, Thermometer, Wind, FlaskConical, Waves, BookOpen, Send } from 'lucide-react'
+import { exportFarmPDF, exportAllFarmsPDF } from '../utils/pdfReport'
+import { Droplets, Thermometer, Wind, FlaskConical, Waves, BookOpen, Send, FileDown } from 'lucide-react'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -109,10 +110,11 @@ function AnnotationCard({ note }) {
 
 // ─── Farmer Chart View ────────────────────────────────────────────────────────
 
-function FarmerAnalytics({ deviceId }) {
+function FarmerAnalytics({ deviceId, liveData, activeCrop, userData }) {
   const [selectedSensor, setSelectedSensor] = useState('soil')
   const [rangeKey, setRangeKey] = useState('7d')
   const [annotations, setAnnotations] = useState([])
+  const [exporting, setExporting] = useState(false)
 
   const { data, loading } = useSensorHistory(deviceId, selectedSensor, rangeKey)
   const stats = computeStats(data)
@@ -139,6 +141,27 @@ function FarmerAnalytics({ deviceId }) {
     }).catch(() => {})
   }, [deviceId])
 
+  async function handleExport() {
+    setExporting(true)
+    try {
+      await exportFarmPDF({
+        cropType:    activeCrop?.crop_type,
+        fieldName:   activeCrop?.field_name,
+        deviceId,
+        sensorKey:   selectedSensor,
+        sensorLabel: meta?.label ?? selectedSensor,
+        rangeKey,
+        stats,
+        liveData,
+        annotations,
+        chartData:   data,
+        adminName:   userData?.role === 'admin' ? userData?.name : null,
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* Sensor tabs */}
@@ -160,19 +183,29 @@ function FarmerAnalytics({ deviceId }) {
             </button>
           )
         })}
-        {/* Range toggle */}
-        <div className="ml-auto flex items-center gap-1 bg-farm-surface2 rounded-xl p-1">
-          {['7d', '30d'].map(r => (
-            <button
-              key={r}
-              onClick={() => setRangeKey(r)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                rangeKey === r ? 'bg-farm-primary text-farm-bg' : 'text-farm-muted'
-              }`}
-            >
-              {r === '7d' ? '7 Days' : '30 Days'}
-            </button>
-          ))}
+        {/* Range toggle + export */}
+        <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-farm-surface2 rounded-xl p-1">
+            {['7d', '30d'].map(r => (
+              <button
+                key={r}
+                onClick={() => setRangeKey(r)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                  rangeKey === r ? 'bg-farm-primary text-farm-bg' : 'text-farm-muted'
+                }`}
+              >
+                {r === '7d' ? '7 Days' : '30 Days'}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting || !stats}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-farm-primary/10 border border-farm-primary/30 text-farm-primary text-xs font-semibold rounded-xl hover:bg-farm-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            {exporting ? 'Exporting...' : 'Export PDF'}
+          </button>
         </div>
       </div>
 
@@ -253,6 +286,7 @@ function AdminAnalytics({ firebaseUser, userData }) {
   const [annotationText, setAnnotationText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [exportingAll, setExportingAll] = useState(false)
 
   // Load all active crops
   useEffect(() => {
@@ -273,6 +307,19 @@ function AdminAnalytics({ firebaseUser, userData }) {
       })
     }).catch(() => {})
   }, [])
+
+  async function handleExportAll() {
+    setExportingAll(true)
+    try {
+      exportAllFarmsPDF({
+        allCrops,
+        liveSnapshots,
+        adminName: userData?.name,
+      })
+    } finally {
+      setExportingAll(false)
+    }
+  }
 
   async function handleSubmitAnnotation() {
     if (!selectedFarm || !annotationText.trim()) return
@@ -309,7 +356,17 @@ function AdminAnalytics({ firebaseUser, userData }) {
 
   return (
     <div className="space-y-6 mt-8 pt-6 border-t border-farm-border">
-      <p className="text-xs font-bold tracking-widest text-farm-primary/70">ADMIN VIEW — ALL FARMS</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold tracking-widest text-farm-primary/70">ADMIN VIEW — ALL FARMS</p>
+        <button
+          onClick={handleExportAll}
+          disabled={exportingAll || allCrops.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-farm-primary text-farm-bg text-xs font-bold rounded-xl hover:bg-farm-primary/90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <FileDown className="w-3.5 h-3.5" />
+          {exportingAll ? 'Exporting...' : 'Export All Farms PDF'}
+        </button>
+      </div>
 
       {/* Farm comparison table */}
       <div className="card overflow-hidden">
@@ -413,7 +470,7 @@ function AdminAnalytics({ firebaseUser, userData }) {
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 
-export default function Analytics({ deviceId, userData, firebaseUser }) {
+export default function Analytics({ deviceId, userData, firebaseUser, liveData, activeCrop }) {
   const isAdmin = userData?.role === 'admin'
 
   if (!deviceId) {
@@ -426,7 +483,12 @@ export default function Analytics({ deviceId, userData, firebaseUser }) {
 
   return (
     <div className="space-y-6">
-      <FarmerAnalytics deviceId={deviceId} />
+      <FarmerAnalytics
+        deviceId={deviceId}
+        liveData={liveData}
+        activeCrop={activeCrop}
+        userData={userData}
+      />
       {isAdmin && (
         <AdminAnalytics firebaseUser={firebaseUser} userData={userData} />
       )}

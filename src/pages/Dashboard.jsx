@@ -232,6 +232,8 @@ export default function Dashboard() {
             deviceId={deviceId}
             userData={userData}
             firebaseUser={firebaseUser}
+            liveData={liveData}
+            activeCrop={activeCrop}
           />
         )
 
