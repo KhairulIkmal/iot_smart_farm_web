@@ -2109,7 +2109,7 @@ function setNotifMode(mode) {
         scheduleBtn.classList.remove('bg-primary', 'text-[#111813]');
         scheduleBtn.classList.add('text-[#9db9a6]', 'hover:text-white');
         datetimeRow.classList.add('hidden');
-        sendLabel.textContent = 'Send Notification';
+        if (sendLabel) sendLabel.textContent = 'Send Notification';
         const scheduledInput = document.getElementById('notif-scheduled-at');
         if (scheduledInput._flatpickr) scheduledInput._flatpickr.clear();
     }
@@ -2174,10 +2174,10 @@ async function sendNotification() {
                 created_by: currentUser.uid,
             });
 
-            clearNotificationForm();
-            await loadScheduledNotifications();
             sendBtn.disabled = false;
             sendBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">schedule</span><span id="send-notif-label">Schedule Notification</span>';
+            clearNotificationForm();
+            await loadScheduledNotifications();
             return;
         }
 
