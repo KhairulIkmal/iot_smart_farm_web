@@ -2269,7 +2269,6 @@ async function loadScheduledNotifications() {
     try {
         const snap = await db.collection('scheduled_notifications')
             .where('status', '==', 'scheduled')
-            .orderBy('scheduled_for', 'asc')
             .get();
 
         if (snap.empty) {
@@ -2277,7 +2276,13 @@ async function loadScheduledNotifications() {
             return;
         }
 
-        listEl.innerHTML = snap.docs.map(doc => {
+        const sortedDocs = snap.docs.slice().sort((a, b) => {
+            const aDate = a.data().scheduled_for?.toDate?.() || new Date(a.data().scheduled_for);
+            const bDate = b.data().scheduled_for?.toDate?.() || new Date(b.data().scheduled_for);
+            return aDate - bDate;
+        });
+
+        listEl.innerHTML = sortedDocs.map(doc => {
             const d = doc.data();
             const scheduledDate = d.scheduled_for?.toDate?.() || new Date(d.scheduled_for);
             const isPast = scheduledDate <= new Date();
