@@ -4531,7 +4531,7 @@ async function openTicket(ticketId) {
     const ticket = ticketDoc.data();
 
     document.getElementById('chat-subject').textContent = ticket.subject || 'Support Ticket';
-    document.getElementById('chat-meta').textContent = `${ticket.farmer_name || 'Farmer'} · Device: ${ticket.device_id || '—'} · ${ticket.device_code || ''}`;
+    document.getElementById('chat-meta').textContent = `${ticket.farmer_name || 'Farmer'} · ${ticket.device_code || ticket.device_id || '—'}`;
 
     // Populate farmer avatar — photo if available, else initials
     const avatarEl = document.getElementById('chat-avatar');
@@ -4749,7 +4749,7 @@ async function sendAdminReply() {
             const file = _selectedImageFile;
             const ext = file.name.split('.').pop();
             const fileName = `${Date.now()}.${ext}`;
-            const storageRef = firebase.storage().ref()
+            const storageRef = storage.ref()
                 .child('support_tickets')
                 .child(currentTicketId)
                 .child(fileName);
