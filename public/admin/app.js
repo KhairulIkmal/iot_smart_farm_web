@@ -4651,6 +4651,28 @@ function renderMessages(docs) {
         const time = m.sent_at ? (m.sent_at.toDate ? m.sent_at.toDate() : new Date(m.sent_at)).toLocaleTimeString('en-MY', { hour: '2-digit', minute: '2-digit' }) : '';
         const showName = i === 0 || docs[i - 1].data().sender_role !== m.sender_role;
 
+        // ── Image message ──
+        if (m.type === 'image' && m.image_url) {
+            const imgBubble = `<img src="${m.image_url}" alt="image"
+                class="max-w-[220px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                style="border:1px solid rgba(43,238,108,0.2)"
+                onclick="openImageViewer('${m.image_url}')"
+                onerror="this.outerHTML='<div class=\\'flex items-center gap-2 text-[#9db9a6] text-xs px-3 py-2\\'><span class=\\'material-symbols-outlined text-[16px]\\'>broken_image</span>Image unavailable</div>'" />`;
+            if (isAdmin) {
+                return `<div class="flex flex-col items-end gap-1">
+                    ${showName ? `<span class="text-xs text-[#9db9a6] mr-1">${m.sender_name || 'Admin'}</span>` : ''}
+                    <div class="bg-primary/10 border border-primary/20 rounded-2xl rounded-tr-sm p-1.5">${imgBubble}</div>
+                    <span class="text-[#9db9a6] text-xs mr-1">${time}</span>
+                </div>`;
+            } else {
+                return `<div class="flex flex-col items-start gap-1">
+                    ${showName ? `<span class="text-xs text-[#9db9a6] ml-1">${m.sender_name || 'Farmer'}</span>` : ''}
+                    <div class="bg-[#28392e] border border-[#3b5443] rounded-2xl rounded-tl-sm p-1.5">${imgBubble}</div>
+                    <span class="text-[#9db9a6] text-xs ml-1">${time}</span>
+                </div>`;
+            }
+        }
+
         if (isAdmin) {
             return `<div class="flex flex-col items-end gap-1">
                 ${showName ? `<span class="text-xs text-[#9db9a6] mr-1">${m.sender_name || 'Admin'}</span>` : ''}
@@ -4674,38 +4696,108 @@ function renderMessages(docs) {
     container.scrollTop = container.scrollHeight;
 }
 
+// ── Image selection state ──
+let _selectedImageFile = null;
+
+function onImageSelected(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    _selectedImageFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const previewArea = document.getElementById('image-preview-area');
+        const previewThumb = document.getElementById('image-preview-thumb');
+        previewThumb.src = e.target.result;
+        previewArea.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-selected
+    event.target.value = '';
+}
+
+function removeSelectedImage() {
+    _selectedImageFile = null;
+    document.getElementById('image-preview-area').classList.add('hidden');
+    document.getElementById('image-preview-thumb').src = '';
+}
+
+function openImageViewer(url) {
+    const overlay = document.createElement('div');
+    overlay.className = 'fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] cursor-zoom-out';
+    overlay.onclick = () => overlay.remove();
+    overlay.innerHTML = `<img src="${url}" class="max-w-[90vw] max-h-[90vh] rounded-xl object-contain" />`;
+    document.body.appendChild(overlay);
+}
+
 async function sendAdminReply() {
     if (!currentTicketId) return;
     const input = document.getElementById('admin-reply-input');
     const text = input.value.trim();
-    if (!text) return;
+    const hasImage = !!_selectedImageFile;
+
+    if (!text && !hasImage) return;
 
     const adminName = document.getElementById('admin-name-text')?.textContent || 'Admin';
-    input.value = '';
+    const sendBtn = document.getElementById('send-reply-btn');
     input.disabled = true;
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<div class="w-4 h-4 border-2 border-[#111813] border-t-transparent rounded-full animate-spin"></div>';
 
     try {
-        const msgRef = db.collection('support_tickets').doc(currentTicketId).collection('messages').doc();
-        await msgRef.set({
-            sender_uid:  currentUser.uid,
-            sender_name: adminName,
-            sender_role: 'admin',
-            text:        text,
-            sent_at:     firebase.firestore.FieldValue.serverTimestamp(),
-        });
+        if (hasImage) {
+            // Upload image to Firebase Storage
+            const file = _selectedImageFile;
+            const ext = file.name.split('.').pop();
+            const fileName = `${Date.now()}.${ext}`;
+            const storageRef = firebase.storage().ref()
+                .child('support_tickets')
+                .child(currentTicketId)
+                .child(fileName);
 
-        // Update ticket — set in_progress if currently open, increment unread for farmer
+            const snapshot = await storageRef.put(file, { contentType: file.type });
+            const downloadUrl = await snapshot.ref.getDownloadURL();
+
+            await db.collection('support_tickets').doc(currentTicketId)
+                .collection('messages').add({
+                    sender_uid:  currentUser.uid,
+                    sender_name: adminName,
+                    sender_role: 'admin',
+                    type:        'image',
+                    image_url:   downloadUrl,
+                    text:        '',
+                    sent_at:     firebase.firestore.FieldValue.serverTimestamp(),
+                });
+
+            removeSelectedImage();
+        }
+
+        if (text) {
+            input.value = '';
+            await db.collection('support_tickets').doc(currentTicketId)
+                .collection('messages').add({
+                    sender_uid:  currentUser.uid,
+                    sender_name: adminName,
+                    sender_role: 'admin',
+                    text:        text,
+                    sent_at:     firebase.firestore.FieldValue.serverTimestamp(),
+                });
+        }
+
+        // Update ticket
         await db.collection('support_tickets').doc(currentTicketId).update({
-            status:       'in_progress',
-            updated_at:   firebase.firestore.FieldValue.serverTimestamp(),
+            status:        'in_progress',
+            updated_at:    firebase.firestore.FieldValue.serverTimestamp(),
             unread_farmer: firebase.firestore.FieldValue.increment(1),
             unread_admin:  0,
         });
     } catch (err) {
         console.error('Send reply error:', err);
-        alert('Failed to send reply: ' + err.message);
+        alert('Failed to send: ' + err.message);
     }
+
     input.disabled = false;
+    sendBtn.disabled = false;
+    sendBtn.innerHTML = '<span class="material-symbols-outlined text-[18px]">send</span>';
     input.focus();
 }
 
