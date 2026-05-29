@@ -2079,10 +2079,30 @@ function setNotifMode(mode) {
         sendNowBtn.classList.add('text-[#9db9a6]', 'hover:text-white');
         datetimeRow.classList.remove('hidden');
         sendLabel.textContent = 'Schedule Notification';
-        // Set min datetime to now
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        document.getElementById('notif-scheduled-at').min = now.toISOString().slice(0, 16);
+        // Open flatpickr calendar + time picker
+        const scheduledInput = document.getElementById('notif-scheduled-at');
+        if (!scheduledInput._flatpickr) {
+            flatpickr(scheduledInput, {
+                enableTime: true,
+                dateFormat: 'Y-m-dTH:i',
+                altInput: true,
+                altFormat: 'D, d M Y  •  h:i K',
+                minDate: new Date(),
+                disableMobile: true,
+                time_24hr: false,
+                onReady(_dates, _str, fp) {
+                    fp.altInput.classList.add(
+                        'w-full', 'py-2.5', 'pl-4', 'pr-10',
+                        'bg-[#111813]', 'border', 'border-[#3b5443]',
+                        'text-white', 'rounded-lg', 'text-sm', 'cursor-pointer',
+                        'focus:outline-none', 'focus:border-primary'
+                    );
+                    fp.altInput.placeholder = 'Click to pick date & time...';
+                },
+            });
+        } else {
+            scheduledInput._flatpickr.set('minDate', new Date());
+        }
     } else {
         sendNowBtn.classList.add('bg-primary', 'text-[#111813]');
         sendNowBtn.classList.remove('text-[#9db9a6]', 'hover:text-white');
@@ -2090,6 +2110,8 @@ function setNotifMode(mode) {
         scheduleBtn.classList.add('text-[#9db9a6]', 'hover:text-white');
         datetimeRow.classList.add('hidden');
         sendLabel.textContent = 'Send Notification';
+        const scheduledInput = document.getElementById('notif-scheduled-at');
+        if (scheduledInput._flatpickr) scheduledInput._flatpickr.clear();
     }
 }
 
@@ -2101,7 +2123,9 @@ function clearNotificationForm() {
     document.getElementById('notif-type').value = 'info';
     document.getElementById('notif-title').value = '';
     document.getElementById('notif-message').value = '';
-    document.getElementById('notif-scheduled-at').value = '';
+    const scheduledInput = document.getElementById('notif-scheduled-at');
+    if (scheduledInput._flatpickr) scheduledInput._flatpickr.clear();
+    else scheduledInput.value = '';
     document.getElementById('message-counter').textContent = '0';
     setNotifMode('now');
 }

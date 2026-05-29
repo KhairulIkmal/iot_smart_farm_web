@@ -55,6 +55,15 @@
         .flatpickr-prev-month:hover svg, .flatpickr-next-month:hover svg { fill: #2bee6c !important; }
         .flatpickr-monthDropdown-months { background: #1c271f !important; }
         .flatpickr-monthDropdown-month { background: #1c271f !important; color: #fff !important; }
+        /* Flatpickr time picker dark theme */
+        .flatpickr-time { background: #1c271f !important; border-top: 1px solid #3b5443 !important; border-radius: 0 0 12px 12px !important; }
+        .flatpickr-time input, .flatpickr-time .flatpickr-am-pm { color: #fff !important; background: transparent !important; font-weight: 600; }
+        .flatpickr-time input:focus, .flatpickr-time .flatpickr-am-pm:focus,
+        .flatpickr-time input:hover, .flatpickr-time .flatpickr-am-pm:hover { background: #28392e !important; outline: none !important; }
+        .flatpickr-time .numInputWrapper span.arrowUp:after { border-bottom-color: #9db9a6 !important; }
+        .flatpickr-time .numInputWrapper span.arrowDown:after { border-top-color: #9db9a6 !important; }
+        .flatpickr-time .numInputWrapper:hover { background: #28392e !important; }
+        .flatpickr-time .flatpickr-time-separator { color: #9db9a6 !important; }
 
         .dark ::-webkit-scrollbar {
             width: 8px;
@@ -1261,8 +1270,12 @@
                             <!-- Schedule datetime (hidden in Send Now mode) -->
                             <div id="schedule-datetime-row" class="hidden">
                                 <label class="text-white text-sm font-medium mb-2 block">Schedule Date & Time</label>
-                                <input id="notif-scheduled-at" type="datetime-local"
-                                    class="w-full py-2.5 px-4 bg-[#111813] border border-[#3b5443] text-white rounded-lg text-sm focus:ring-primary focus:border-primary" />
+                                <div class="relative">
+                                    <input id="notif-scheduled-at" type="text" readonly
+                                        placeholder="Click to pick date & time..."
+                                        class="w-full py-2.5 pl-4 pr-10 bg-[#111813] border border-[#3b5443] text-white rounded-lg text-sm cursor-pointer focus:outline-none focus:border-primary" />
+                                    <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-[#9db9a6] text-[20px] pointer-events-none">calendar_month</span>
+                                </div>
                                 <p class="text-[#9db9a6] text-xs mt-1">Notification will be saved as scheduled — use "Send Now" on the scheduled card to dispatch it.</p>
                             </div>
 
