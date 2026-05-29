@@ -1976,6 +1976,9 @@ function initializeNotificationForm() {
     // Load users for specific user dropdown
     loadNotificationUsers();
 
+    // Load scheduled notifications
+    loadScheduledNotifications();
+
     // Handle recipient type change
     const recipientType = document.getElementById('notif-recipient-type');
     const specificUserContainer = document.getElementById('specific-user-select-container');
@@ -2059,6 +2062,37 @@ function setNotificationTemplate(type, title, message) {
     document.getElementById('message-counter').textContent = message.length;
 }
 
+// ── Notification mode (send now / schedule) ──
+let _notifMode = 'now';
+
+function setNotifMode(mode) {
+    _notifMode = mode;
+    const sendNowBtn = document.getElementById('mode-send-now');
+    const scheduleBtn = document.getElementById('mode-schedule');
+    const datetimeRow = document.getElementById('schedule-datetime-row');
+    const sendLabel = document.getElementById('send-notif-label');
+
+    if (mode === 'schedule') {
+        scheduleBtn.classList.add('bg-primary', 'text-[#111813]');
+        scheduleBtn.classList.remove('text-[#9db9a6]', 'hover:text-white');
+        sendNowBtn.classList.remove('bg-primary', 'text-[#111813]');
+        sendNowBtn.classList.add('text-[#9db9a6]', 'hover:text-white');
+        datetimeRow.classList.remove('hidden');
+        sendLabel.textContent = 'Schedule Notification';
+        // Set min datetime to now
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('notif-scheduled-at').min = now.toISOString().slice(0, 16);
+    } else {
+        sendNowBtn.classList.add('bg-primary', 'text-[#111813]');
+        sendNowBtn.classList.remove('text-[#9db9a6]', 'hover:text-white');
+        scheduleBtn.classList.remove('bg-primary', 'text-[#111813]');
+        scheduleBtn.classList.add('text-[#9db9a6]', 'hover:text-white');
+        datetimeRow.classList.add('hidden');
+        sendLabel.textContent = 'Send Notification';
+    }
+}
+
 // Clear notification form
 function clearNotificationForm() {
     document.getElementById('notif-recipient-type').value = 'all';
@@ -2067,7 +2101,9 @@ function clearNotificationForm() {
     document.getElementById('notif-type').value = 'info';
     document.getElementById('notif-title').value = '';
     document.getElementById('notif-message').value = '';
+    document.getElementById('notif-scheduled-at').value = '';
     document.getElementById('message-counter').textContent = '0';
+    setNotifMode('now');
 }
 
 // Send notification
@@ -2078,20 +2114,46 @@ async function sendNotification() {
         const type = document.getElementById('notif-type').value;
         const title = document.getElementById('notif-title').value.trim();
         const message = document.getElementById('notif-message').value.trim();
+        const isSchedule = _notifMode === 'schedule';
+        const scheduledAt = document.getElementById('notif-scheduled-at').value;
 
         // Validation
-        if (!title) {
-            alert('Please enter a notification title');
-            return;
-        }
+        if (!title) { alert('Please enter a notification title'); return; }
+        if (!message) { alert('Please enter a notification message'); return; }
+        if (recipientType === 'specific' && !specificUserId) { alert('Please select a specific user'); return; }
+        if (isSchedule && !scheduledAt) { alert('Please select a schedule date and time'); return; }
+        if (isSchedule && new Date(scheduledAt) <= new Date()) { alert('Scheduled time must be in the future'); return; }
 
-        if (!message) {
-            alert('Please enter a notification message');
-            return;
-        }
+        // ── Schedule mode — save to scheduled_notifications and stop ──
+        if (isSchedule) {
+            const sendBtn = document.getElementById('send-notif-btn');
+            sendBtn.disabled = true;
+            sendBtn.innerHTML = '<span class="material-symbols-outlined text-[20px] animate-spin">progress_activity</span><span>Scheduling...</span>';
 
-        if (recipientType === 'specific' && !specificUserId) {
-            alert('Please select a specific user');
+            let recipientLabel = 'All Users';
+            let recipientId = null;
+            if (recipientType === 'specific') {
+                const userDoc = await db.collection('users').doc(specificUserId).get();
+                const ud = userDoc.exists ? userDoc.data() : {};
+                recipientLabel = ud.full_name || ud.name || specificUserId;
+                recipientId = ud.uid || specificUserId;
+            }
+
+            await db.collection('scheduled_notifications').add({
+                type, title, message,
+                recipient_type: recipientType,
+                recipient_id: recipientId,
+                recipient_label: recipientLabel,
+                scheduled_for: firebase.firestore.Timestamp.fromDate(new Date(scheduledAt)),
+                status: 'scheduled',
+                created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                created_by: currentUser.uid,
+            });
+
+            clearNotificationForm();
+            await loadScheduledNotifications();
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">schedule</span><span id="send-notif-label">Schedule Notification</span>';
             return;
         }
 
@@ -2172,6 +2234,121 @@ async function sendNotification() {
         const sendBtn = document.getElementById('send-notif-btn');
         sendBtn.disabled = false;
         sendBtn.innerHTML = '<span class="material-symbols-outlined text-[20px]">send</span><span>Send Notification</span>';
+    }
+}
+
+// ── Scheduled notifications list ──
+async function loadScheduledNotifications() {
+    const listEl = document.getElementById('scheduled-notifs-list');
+    if (!listEl) return;
+
+    try {
+        const snap = await db.collection('scheduled_notifications')
+            .where('status', '==', 'scheduled')
+            .orderBy('scheduled_for', 'asc')
+            .get();
+
+        if (snap.empty) {
+            listEl.innerHTML = '<div class="p-5 text-center text-[#9db9a6] text-sm">No scheduled notifications</div>';
+            return;
+        }
+
+        listEl.innerHTML = snap.docs.map(doc => {
+            const d = doc.data();
+            const scheduledDate = d.scheduled_for?.toDate?.() || new Date(d.scheduled_for);
+            const isPast = scheduledDate <= new Date();
+            const dateStr = scheduledDate.toLocaleString('en-MY', {
+                day: '2-digit', month: 'short', year: 'numeric',
+                hour: '2-digit', minute: '2-digit',
+            });
+            const typeColors = { info: 'text-blue-400', warning: 'text-yellow-400', alert: 'text-red-400', success: 'text-green-400' };
+            const typeColor = typeColors[d.type] || 'text-[#9db9a6]';
+
+            return `<div class="p-4 flex items-start gap-4">
+                <div class="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center ${isPast ? 'bg-red-400/10' : 'bg-yellow-400/10'}">
+                    <span class="material-symbols-outlined text-[18px] ${isPast ? 'text-red-400' : 'text-yellow-400'}">schedule</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-0.5">
+                        <span class="text-white text-sm font-semibold truncate">${escapeHtml(d.title)}</span>
+                        <span class="text-xs font-medium ${typeColor} uppercase">${d.type}</span>
+                        ${isPast ? '<span class="text-xs text-red-400 font-medium">• Overdue</span>' : ''}
+                    </div>
+                    <p class="text-[#9db9a6] text-xs truncate mb-1">${escapeHtml(d.message)}</p>
+                    <div class="flex items-center gap-3 text-xs text-[#9db9a6]">
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[13px]">group</span>
+                            ${escapeHtml(d.recipient_label || 'All Users')}
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[13px]">calendar_today</span>
+                            ${dateStr}
+                        </span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button onclick="sendScheduledNow('${doc.id}')"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 hover:bg-primary/20 border border-primary/30 text-primary rounded-lg text-xs font-semibold transition-colors">
+                        <span class="material-symbols-outlined text-[14px]">send</span> Send Now
+                    </button>
+                    <button onclick="cancelScheduledNotification('${doc.id}')"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-red-400/10 hover:bg-red-400/20 border border-red-400/30 text-red-400 rounded-lg text-xs font-semibold transition-colors">
+                        <span class="material-symbols-outlined text-[14px]">close</span> Cancel
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        console.error('Error loading scheduled notifications:', err);
+        listEl.innerHTML = '<div class="p-5 text-center text-red-400 text-sm">Error loading scheduled notifications</div>';
+    }
+}
+
+async function sendScheduledNow(docId) {
+    if (!confirm('Send this notification now?')) return;
+    try {
+        const doc = await db.collection('scheduled_notifications').doc(docId).get();
+        if (!doc.exists) return;
+        const d = doc.data();
+
+        const notificationData = {
+            type: d.type,
+            title: d.title,
+            message: d.message,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false,
+            sentBy: 'admin',
+        };
+
+        if (d.recipient_type === 'specific' && d.recipient_id) {
+            notificationData.farmer_id = d.recipient_id;
+            await db.collection('notifications').add(notificationData);
+        } else {
+            const usersSnap = await db.collection('users').get();
+            const batch = db.batch();
+            usersSnap.forEach(userDoc => {
+                const ref = db.collection('notifications').doc();
+                batch.set(ref, { ...notificationData, farmer_id: userDoc.data().uid || userDoc.id });
+            });
+            await batch.commit();
+        }
+
+        // Mark as sent
+        await db.collection('scheduled_notifications').doc(docId).update({ status: 'sent' });
+        await loadScheduledNotifications();
+        await loadAllNotifications();
+    } catch (err) {
+        alert('Failed to send: ' + err.message);
+    }
+}
+
+async function cancelScheduledNotification(docId) {
+    if (!confirm('Cancel this scheduled notification?')) return;
+    try {
+        await db.collection('scheduled_notifications').doc(docId).update({ status: 'cancelled' });
+        await loadScheduledNotifications();
+    } catch (err) {
+        alert('Failed to cancel: ' + err.message);
     }
 }
 

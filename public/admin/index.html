@@ -1172,7 +1172,18 @@
                         <div class="flex items-center justify-between mb-5">
                             <div>
                                 <h2 class="text-white text-xl font-bold">Send Notification</h2>
-                                <p class="text-[#9db9a6] text-sm mt-1">Send custom alerts or system maintenance notifications to users</p>
+                                <p class="text-[#9db9a6] text-sm mt-1">Send custom alerts or schedule notifications for later</p>
+                            </div>
+                            <!-- Send Now / Schedule toggle -->
+                            <div class="flex bg-[#111813] border border-[#3b5443] rounded-lg p-1 gap-1">
+                                <button id="mode-send-now" onclick="setNotifMode('now')"
+                                    class="px-3 py-1.5 rounded-md text-xs font-semibold transition-all bg-primary text-[#111813]">
+                                    Send Now
+                                </button>
+                                <button id="mode-schedule" onclick="setNotifMode('schedule')"
+                                    class="px-3 py-1.5 rounded-md text-xs font-semibold transition-all text-[#9db9a6] hover:text-white">
+                                    Schedule
+                                </button>
                             </div>
                         </div>
 
@@ -1247,6 +1258,14 @@
                                 <p class="text-[#9db9a6] text-xs mt-1"><span id="message-counter">0</span>/500 characters</p>
                             </div>
 
+                            <!-- Schedule datetime (hidden in Send Now mode) -->
+                            <div id="schedule-datetime-row" class="hidden">
+                                <label class="text-white text-sm font-medium mb-2 block">Schedule Date & Time</label>
+                                <input id="notif-scheduled-at" type="datetime-local"
+                                    class="w-full py-2.5 px-4 bg-[#111813] border border-[#3b5443] text-white rounded-lg text-sm focus:ring-primary focus:border-primary" />
+                                <p class="text-[#9db9a6] text-xs mt-1">Notification will be saved as scheduled — use "Send Now" on the scheduled card to dispatch it.</p>
+                            </div>
+
                             <!-- Send Button -->
                             <div class="flex justify-end gap-3">
                                 <button id="clear-notif-btn" class="px-6 py-2.5 bg-[#28392e] hover:bg-[#3b5443] text-white rounded-lg font-medium transition-colors">
@@ -1254,9 +1273,25 @@
                                 </button>
                                 <button id="send-notif-btn" class="px-6 py-2.5 bg-primary hover:bg-[#5fa671] text-white rounded-lg font-medium transition-colors flex items-center gap-2">
                                     <span class="material-symbols-outlined text-[20px]">send</span>
-                                    <span>Send Notification</span>
+                                    <span id="send-notif-label">Send Notification</span>
                                 </button>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Scheduled Notifications -->
+                    <div id="scheduled-notifs-card" class="bg-[#1c271f] rounded-xl border border-[#28392e] shadow-sm overflow-hidden">
+                        <div class="p-5 border-b border-[#28392e] flex items-center justify-between">
+                            <div>
+                                <h2 class="text-white text-lg font-bold flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-yellow-400 text-[20px]">schedule</span>
+                                    Scheduled Notifications
+                                </h2>
+                                <p class="text-[#9db9a6] text-sm mt-1">Pending notifications — dispatch or cancel anytime</p>
+                            </div>
+                        </div>
+                        <div id="scheduled-notifs-list" class="divide-y divide-[#28392e]">
+                            <div class="p-5 text-center text-[#9db9a6] text-sm">No scheduled notifications</div>
                         </div>
                     </div>
 
