@@ -3934,7 +3934,7 @@ async function generateAndDownloadPDF() {
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(...C.muted);
-        doc.text('Smart Farm Management System  ·  Admin Analytics Report', margin + 5, 24);
+        doc.text('AgroEzuran  ·  Admin Analytics Report', margin + 5, 24);
 
         // "CONFIDENTIAL" tag
         doc.setFillColor(...C.surface2);
