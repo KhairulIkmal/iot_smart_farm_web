@@ -4284,7 +4284,11 @@ function renderDevices() {
             <td class="p-4">${claimedBy}</td>
             <td class="p-4 text-[#9db9a6] text-sm">${claimedDate}</td>
             <td class="p-4">${notes}</td>
-            <td class="p-4 text-right">
+            <td class="p-4 text-right flex items-center justify-end gap-2">
+                <button onclick="copyFirmwareCode('${dev.id}')"
+                    class="px-3 py-1.5 text-xs rounded-lg border border-primary/30 text-primary hover:bg-primary/10 transition-colors flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[13px]">code</span> Firmware
+                </button>
                 <button onclick="toggleDeviceStatus('${dev.id}', '${dev.status}')"
                     class="px-3 py-1.5 text-xs rounded-lg border border-[#3b5443] text-[#9db9a6] hover:text-white hover:border-[#9db9a6] transition-colors">
                     ${dev.status === 'inactive' ? 'Reactivate' : 'Deactivate'}
@@ -4335,6 +4339,306 @@ function generateUniqueDeviceCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const part = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     return `AGR-${part(4)}-${part(4)}`;
+}
+
+function copyFirmwareCode(deviceId) {
+    const firmware = `// Smart Farm ESP32 — Firebase RTDB + SH1107 OLED (128×128) + Pump Control
+// Hardware: ESP32 + DHT11 (GPIO17) + Soil ADC (GPIO36) + pH ADC (GPIO39) + Water Level ADC (GPIO32) + Pump via Motor2 + SH1107 OLED
+// Firebase Paths:
+//   sensors/${deviceId}/live         — real-time sensor data
+//   sensors/${deviceId}/history      — periodic historical data (keyed by timestamp)
+//   sensors/${deviceId}/sensorHealth — sensor status (ok/error)
+//   commands/${deviceId}             — pump control and settings from app
+
+#include <Arduino.h>
+#include <WiFi.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SH110X.h>
+#include <math.h>
+#include "DHT.h"
+
+// Firebase ESP32 Library
+#include <Firebase_ESP_Client.h>
+#include "addons/TokenHelper.h"
+#include "addons/RTDBHelper.h"
+#include <time.h> // For NTP time
+
+// ================= Credentials =================
+#define WIFI_SSID "Kairi"
+#define WIFI_PASSWORD "Ikmal0341"
+#define FIREBASE_API_KEY "AIzaSyDKEGXzw8kX7k4YvjjxQF4_4AzZYyH_xmQ"
+#define FIREBASE_DB_URL "https://iot-smartfarm-system-default-rtdb.asia-southeast1.firebasedatabase.app"
+
+// ================= Pin map =================
+#define PIN_DHT 17
+#define DHT_TYPE DHT11
+#define PIN_SOIL_ADC 36
+#define PIN_PH_ADC 39
+#define PIN_WATER_LEVEL_ADC 32
+
+// ---- Pump on RoboESP32 Motor2 ----
+#define M2_EN -1
+#define M2A 14
+#define M2B 27
+
+// ---- Buzzer ----
+#define PIN_BUZZER 23
+#define BUZZER_CH  0
+
+// ================ Water Level Calibration ===============
+#define WATER_LEVEL_DRY 0
+#define WATER_LEVEL_WET 2500
+
+// ================ Device ID =================
+#define DEVICE_ID "${deviceId}"
+
+// ================ OLED (SH1107) ============
+#define OLED_WIDTH 128
+#define OLED_HEIGHT 128
+Adafruit_SH1107 display(OLED_WIDTH, OLED_HEIGHT, &Wire);
+
+// ================ Firebase =================
+FirebaseData fbdo;
+FirebaseData streamFbdo;
+FirebaseAuth auth;
+FirebaseConfig config;
+bool firebaseReady = false;
+bool signupOK = false;
+
+// ================ Globals ==================
+DHT dht(PIN_DHT, DHT_TYPE);
+
+struct EnvState {
+  float dhtTempC = NAN;
+  float dhtHum = NAN;
+  int soilRaw = 0;
+  int soilPct = -1;
+  float phValue = NAN;
+  int waterLevelRaw = 0;
+  int tankPct = -1;
+  bool pumpOn = false;
+  String lastErr;
+} S;
+
+struct SensorHealth {
+  String soil = "ok";
+  String ph = "ok";
+  String waterLevel = "ok";
+  String temp = "ok";
+  String humidity = "ok";
+  bool changed = true;
+} health;
+
+struct CommandState {
+  String mode = "manual";
+  bool pumpCmd = false;
+  int soilThreshLow = 30;
+  int soilThreshHigh = 50;
+  int minWaterLevel = 15;
+  uint32_t updatedAt = 0;
+} CMD;
+
+#define INTERVAL_HEARTBEAT 2000
+#define INTERVAL_SENSORS 5000
+#define INTERVAL_HISTORY 300000
+#define INTERVAL_OLED 1200
+#define INTERVAL_AUTO 1000
+#define INTERVAL_SCREEN_ROTATE 4000
+
+uint32_t lastHeartbeat = 0;
+uint32_t lastSensorPush = 0;
+uint32_t lastHistoryPush = 0;
+uint32_t lastSensorRead = 0;
+uint32_t lastOLED = 0;
+uint32_t lastAutoCheck = 0;
+uint32_t lastScreenRotate = 0;
+int currentScreen = 0;
+
+int mapSoilToPercent(int raw, int dry = 3300, int wet = 1200) {
+  if (raw < wet) raw = wet;
+  if (raw > dry) raw = dry;
+  return map(raw, dry, wet, 0, 100);
+}
+
+float readPH(int raw) {
+  float voltage = raw * (3.3 / 4095.0);
+  float ph = 3.5 * voltage + 0.0;
+  if (ph < 0 || ph > 14) return NAN;
+  return ph;
+}
+
+int readWaterLevelPercent(int raw) {
+  int pct = map(raw, WATER_LEVEL_DRY, WATER_LEVEL_WET, 0, 100);
+  return constrain(pct, 0, 100);
+}
+
+#define ADC_DISCONNECT_LOW 50
+#define ADC_DISCONNECT_HIGH 4000
+
+void updateSensorHealth() {
+  String oldSoil = health.soil, oldPh = health.ph, oldWater = health.waterLevel, oldTemp = health.temp, oldHum = health.humidity;
+  health.soil = (S.soilRaw < ADC_DISCONNECT_LOW || S.soilRaw > ADC_DISCONNECT_HIGH) ? "error" : (S.soilPct >= 0 ? "ok" : "error");
+  int phRaw = analogRead(PIN_PH_ADC);
+  health.ph = (phRaw < ADC_DISCONNECT_LOW || phRaw > ADC_DISCONNECT_HIGH) ? "error" : (!isnan(S.phValue) ? "ok" : "error");
+  health.waterLevel = (S.waterLevelRaw < ADC_DISCONNECT_LOW || S.waterLevelRaw > ADC_DISCONNECT_HIGH) ? "error" : (S.tankPct >= 0 ? "ok" : "error");
+  health.temp = isnan(S.dhtTempC) ? "error" : "ok";
+  health.humidity = isnan(S.dhtHum) ? "error" : "ok";
+  if (health.soil != oldSoil || health.ph != oldPh || health.waterLevel != oldWater || health.temp != oldTemp || health.humidity != oldHum) health.changed = true;
+}
+
+void buzzerInit() { ledcSetup(BUZZER_CH, 2000, 8); ledcAttachPin(PIN_BUZZER, BUZZER_CH); ledcWrite(BUZZER_CH, 0); }
+void buzzSensorError() { for (int i=0;i<3;i++){ledcWriteTone(BUZZER_CH,800);delay(100);ledcWrite(BUZZER_CH,0);delay(80);} }
+void buzzConnectFail() { ledcWriteTone(BUZZER_CH,800);delay(300);ledcWrite(BUZZER_CH,0);delay(80);ledcWriteTone(BUZZER_CH,400);delay(500);ledcWrite(BUZZER_CH,0); }
+void buzzSuccess() { ledcWriteTone(BUZZER_CH,523);delay(150);ledcWrite(BUZZER_CH,0);delay(50);ledcWriteTone(BUZZER_CH,659);delay(150);ledcWrite(BUZZER_CH,0);delay(50);ledcWriteTone(BUZZER_CH,784);delay(300);ledcWrite(BUZZER_CH,0); }
+void buzzPumpOn() { ledcWriteTone(BUZZER_CH,400);delay(80);ledcWrite(BUZZER_CH,0);delay(30);ledcWriteTone(BUZZER_CH,800);delay(120);ledcWrite(BUZZER_CH,0); }
+void buzzPumpOff() { ledcWriteTone(BUZZER_CH,800);delay(80);ledcWrite(BUZZER_CH,0);delay(30);ledcWriteTone(BUZZER_CH,400);delay(120);ledcWrite(BUZZER_CH,0); }
+
+void pumpInit() { pinMode(M2A,OUTPUT);pinMode(M2B,OUTPUT);digitalWrite(M2A,LOW);digitalWrite(M2B,LOW);if(M2_EN>=0){pinMode(M2_EN,OUTPUT);digitalWrite(M2_EN,HIGH);} }
+void pumpOn() { digitalWrite(M2A,HIGH);digitalWrite(M2B,LOW);S.pumpOn=true;Serial.println("[PUMP] ON");buzzPumpOn(); }
+void pumpOff() { digitalWrite(M2A,LOW);digitalWrite(M2B,LOW);S.pumpOn=false;Serial.println("[PUMP] OFF");buzzPumpOff(); }
+
+void executeCommands() {
+  if (CMD.mode == "manual") {
+    if (CMD.pumpCmd && !S.pumpOn) pumpOn();
+    else if (!CMD.pumpCmd && S.pumpOn) pumpOff();
+  } else if (CMD.mode == "auto") {
+    if (S.tankPct >= 0 && S.tankPct < CMD.minWaterLevel) { if (S.pumpOn) pumpOff(); return; }
+    if (S.soilPct >= 0) {
+      if (S.soilPct < CMD.soilThreshLow && !S.pumpOn) pumpOn();
+      else if (S.soilPct >= CMD.soilThreshHigh && S.pumpOn) pumpOff();
+    }
+  }
+}
+
+void streamCallback(FirebaseStream data) {
+  String path = data.dataPath();
+  if (data.dataTypeEnum() == fb_esp_rtdb_data_type_json) {
+    FirebaseJson json = data.jsonObject(); FirebaseJsonData result;
+    if (json.get(result,"mode") && result.success) CMD.mode = result.to<String>();
+    if (json.get(result,"pump") && result.success) CMD.pumpCmd = (result.typeNum==FirebaseJson::JSON_STRING) ? (result.to<String>()=="on") : result.to<bool>();
+    if (json.get(result,"soilThreshLow") && result.success) CMD.soilThreshLow = result.to<int>();
+    if (json.get(result,"soilThreshHigh") && result.success) CMD.soilThreshHigh = result.to<int>();
+    if (json.get(result,"minWaterLevel") && result.success) CMD.minWaterLevel = result.to<int>();
+  } else {
+    if (path=="/mode") CMD.mode=data.stringData();
+    else if (path=="/pump") CMD.pumpCmd=(data.dataTypeEnum()==fb_esp_rtdb_data_type_string)?(data.stringData()=="on"):data.boolData();
+    else if (path=="/soilThreshLow") CMD.soilThreshLow=data.intData();
+    else if (path=="/soilThreshHigh") CMD.soilThreshHigh=data.intData();
+    else if (path=="/minWaterLevel") CMD.minWaterLevel=data.intData();
+  }
+}
+
+void streamTimeoutCallback(bool timeout) {
+  if (timeout) Serial.println("[STREAM] Timeout, reconnecting...");
+  if (!streamFbdo.httpConnected()) Serial.printf("[STREAM] Error: %s\\n", streamFbdo.errorReason().c_str());
+}
+
+void pushHeartbeat() {
+  if (!firebaseReady || !signupOK) return;
+  Firebase.RTDB.setTimestamp(&fbdo, ("sensors/" DEVICE_ID "/live/lastSeen"));
+}
+
+void pushSensorData() {
+  if (!firebaseReady || !signupOK) return;
+  FirebaseJson json;
+  json.set("temp", isnan(S.dhtTempC) ? 0 : (int)roundf(S.dhtTempC));
+  json.set("humidity", isnan(S.dhtHum) ? 0 : (int)roundf(S.dhtHum));
+  json.set("soil", S.soilPct >= 0 ? S.soilPct : 0);
+  json.set("ph", isnan(S.phValue) ? 0.0 : S.phValue);
+  json.set("waterLevel", S.tankPct >= 0 ? S.tankPct : 0);
+  json.set("pumpOn", S.pumpOn);
+  json.set("mode", CMD.mode);
+  json.set("lastSeen/.sv", "timestamp");
+  json.set("timestamp/.sv", "timestamp");
+  if (!Firebase.RTDB.setJSON(&fbdo, "sensors/" DEVICE_ID "/live", &json)) S.lastErr = fbdo.errorReason();
+}
+
+void pushHistoryData() {
+  if (!firebaseReady || !signupOK) return;
+  time_t now = time(nullptr);
+  if (now < 1000000000) now = (millis()/1000) + 1700000000UL;
+  String base = "sensors/" DEVICE_ID "/history/";
+  if (!isnan(S.dhtTempC)) Firebase.RTDB.setInt(&fbdo,(base+"temp/"+String((unsigned long)now)).c_str(),(int)S.dhtTempC);
+  if (!isnan(S.dhtHum))   Firebase.RTDB.setInt(&fbdo,(base+"humidity/"+String((unsigned long)now)).c_str(),(int)S.dhtHum);
+  if (S.soilPct>=0)        Firebase.RTDB.setInt(&fbdo,(base+"soil/"+String((unsigned long)now)).c_str(),S.soilPct);
+  if (!isnan(S.phValue))   Firebase.RTDB.setFloat(&fbdo,(base+"ph/"+String((unsigned long)now)).c_str(),S.phValue);
+  if (S.tankPct>=0)        Firebase.RTDB.setInt(&fbdo,(base+"waterLevel/"+String((unsigned long)now)).c_str(),S.tankPct);
+}
+
+void pushSensorHealth() {
+  if (!firebaseReady || !health.changed) return;
+  FirebaseJson json;
+  json.set("soil",health.soil); json.set("ph",health.ph); json.set("waterLevel",health.waterLevel);
+  json.set("temp",health.temp); json.set("humidity",health.humidity);
+  if (Firebase.RTDB.setJSON(&fbdo,"sensors/" DEVICE_ID "/sensorHealth",&json)) health.changed=false;
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(PIN_WATER_LEVEL_ADC,INPUT); pinMode(PIN_SOIL_ADC,INPUT); pinMode(PIN_PH_ADC,INPUT);
+  Wire.begin(21,22);
+  display.begin(0x3C,true); display.setRotation(1); display.clearDisplay();
+  display.setTextSize(1); display.setTextColor(SH110X_WHITE); display.setTextWrap(false);
+  display.setCursor(0,0); display.print("Smart Farm Boot..."); display.display();
+  dht.begin(); pumpInit(); buzzerInit();
+  WiFi.mode(WIFI_STA); WiFi.begin(WIFI_SSID,WIFI_PASSWORD);
+  int wifiAttempts=0;
+  while (WiFi.status()!=WL_CONNECTED && wifiAttempts<30) { delay(500); wifiAttempts++; }
+  if (WiFi.status()!=WL_CONNECTED) { buzzConnectFail(); return; }
+  configTime(8*3600,0,"pool.ntp.org","time.nist.gov");
+  config.api_key = FIREBASE_API_KEY;
+  config.database_url = FIREBASE_DB_URL;
+  config.token_status_callback = tokenStatusCallback;
+  auth.user.email = "esp32_device@smartfarm.com";
+  auth.user.password = "esp32_pass";
+  Firebase.begin(&config,&auth); Firebase.reconnectWiFi(true); signupOK=true;
+  unsigned long fbStart=millis();
+  while (!Firebase.ready() && (millis()-fbStart<15000)) delay(200);
+  if (Firebase.ready()) {
+    firebaseReady=true; buzzSuccess();
+    if (!Firebase.RTDB.beginStream(&streamFbdo,"commands/" DEVICE_ID))
+      Serial.printf("[FB] Stream failed: %s\\n",streamFbdo.errorReason().c_str());
+    else Firebase.RTDB.setStreamCallback(&streamFbdo,streamCallback,streamTimeoutCallback);
+  } else { S.lastErr="FB not ready"; buzzConnectFail(); }
+  delay(1500);
+}
+
+void loop() {
+  uint32_t now = millis();
+  if (now-lastHeartbeat>=INTERVAL_HEARTBEAT)   { lastHeartbeat=now; pushHeartbeat(); }
+  if (now-lastSensorRead>=INTERVAL_SENSORS) {
+    lastSensorRead=now;
+    S.dhtTempC=dht.readTemperature(); S.dhtHum=dht.readHumidity();
+    S.soilRaw=analogRead(PIN_SOIL_ADC);
+    S.soilPct=(S.soilRaw<50||S.soilRaw>4000)?-1:mapSoilToPercent(S.soilRaw);
+    int phRaw=analogRead(PIN_PH_ADC);
+    S.phValue=(phRaw<50||phRaw>4000)?NAN:readPH(phRaw);
+    S.waterLevelRaw=analogRead(PIN_WATER_LEVEL_ADC);
+    S.tankPct=(S.waterLevelRaw<50||S.waterLevelRaw>4000)?-1:readWaterLevelPercent(S.waterLevelRaw);
+    updateSensorHealth();
+    if (hasAnyError()) buzzSensorError();
+  }
+  if (now-lastSensorPush>=INTERVAL_SENSORS)    { lastSensorPush=now; pushSensorData(); pushSensorHealth(); }
+  if (now-lastAutoCheck>=INTERVAL_AUTO)        { lastAutoCheck=now; executeCommands(); }
+  if (now-lastHistoryPush>=INTERVAL_HISTORY)   { lastHistoryPush=now; pushHistoryData(); }
+  if (now-lastScreenRotate>=INTERVAL_SCREEN_ROTATE) { lastScreenRotate=now; currentScreen=(currentScreen+1)%4; }
+  if (now-lastOLED>=INTERVAL_OLED)             { lastOLED=now; drawOLED(); }
+}`;
+
+    navigator.clipboard.writeText(firmware).then(() => {
+        // Brief visual feedback on the button
+        const btn = event.currentTarget;
+        const original = btn.innerHTML;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[13px]">check</span> Copied!';
+        btn.classList.replace('text-primary', 'text-green-400');
+        btn.classList.replace('border-primary/30', 'border-green-400/30');
+        setTimeout(() => {
+            btn.innerHTML = original;
+            btn.classList.replace('text-green-400', 'text-primary');
+            btn.classList.replace('border-green-400/30', 'border-primary/30');
+        }, 2000);
+    }).catch(() => alert('Copy failed — please allow clipboard access.'));
 }
 
 async function toggleDeviceStatus(deviceId, currentStatus) {
