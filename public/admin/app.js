@@ -4626,10 +4626,10 @@ void loop() {
   if (now-lastOLED>=INTERVAL_OLED)             { lastOLED=now; drawOLED(); }
 }`;
 
-    navigator.clipboard.writeText(firmware).then(() => {
-        // Brief visual feedback on the button
-        const btn = event.currentTarget;
-        const original = btn.innerHTML;
+    const btn = event.currentTarget;
+    const original = btn.innerHTML;
+
+    const markCopied = () => {
         btn.innerHTML = '<span class="material-symbols-outlined text-[13px]">check</span> Copied!';
         btn.classList.replace('text-primary', 'text-green-400');
         btn.classList.replace('border-primary/30', 'border-green-400/30');
@@ -4638,7 +4638,30 @@ void loop() {
             btn.classList.replace('text-green-400', 'text-primary');
             btn.classList.replace('border-green-400/30', 'border-primary/30');
         }, 2000);
-    }).catch(() => alert('Copy failed — please allow clipboard access.'));
+    };
+
+    // Try modern clipboard API first, fallback to execCommand
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(firmware).then(markCopied).catch(() => fallbackCopy());
+    } else {
+        fallbackCopy();
+    }
+
+    function fallbackCopy() {
+        const ta = document.createElement('textarea');
+        ta.value = firmware;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        try {
+            document.execCommand('copy');
+            markCopied();
+        } catch (e) {
+            alert('Copy failed. Please copy the firmware manually.');
+        }
+        document.body.removeChild(ta);
+    }
 }
 
 async function toggleDeviceStatus(deviceId, currentStatus) {
