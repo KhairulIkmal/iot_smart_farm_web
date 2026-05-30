@@ -4,6 +4,7 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>AgroEzuran Admin</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -390,8 +391,8 @@
 <!-- Mobile Top Bar -->
 <div id="mobile-topbar" class="hidden fixed top-0 left-0 right-0 z-40 bg-[#111813] border-b border-[#28392e] px-4 py-3 items-center justify-between lg:!hidden">
     <div class="flex items-center gap-2">
-        <div class="w-7 h-7 bg-primary/10 rounded-lg flex items-center justify-center">
-            <span class="material-symbols-outlined text-primary text-[18px]">agriculture</span>
+        <div class="w-7 h-7 flex items-center justify-center">
+            <img src="../agroezuran_icon_allmode.svg" class="w-7 h-7" alt="AgroEzuran" />
         </div>
         <span class="text-white font-bold text-base">AgroEzuran</span>
         <span class="text-[#9db9a6] text-xs ml-1">Admin</span>
@@ -408,8 +409,8 @@
 <div id="mobile-drawer" class="hidden fixed top-0 left-0 bottom-0 w-64 bg-[#111813] border-r border-[#28392e] z-50 flex flex-col p-4 lg:hidden transform -translate-x-full transition-transform duration-300">
     <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-2">
-            <div class="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-                <span class="material-symbols-outlined text-primary text-[20px]">agriculture</span>
+            <div class="w-8 h-8 flex items-center justify-center">
+                <img src="../agroezuran_icon_allmode.svg" class="w-8 h-8" alt="AgroEzuran" />
             </div>
             <span class="text-white font-bold">AgroEzuran Admin</span>
         </div>
@@ -462,6 +463,20 @@
 <!-- Login Screen -->
 <div id="login-screen" class="min-h-screen w-full flex items-center justify-center p-6 relative overflow-hidden" style="background:#0a1a0e;">
 
+    <!-- Top nav -->
+    <div style="position:absolute;top:0;left:0;right:0;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid rgba(59,84,67,0.4);">
+        <div class="flex items-center gap-2">
+            <img src="../agroezuran_icon_allmode.svg" style="width:32px;height:32px;" alt="AgroEzuran" />
+            <span style="font-size:16px;font-weight:800;letter-spacing:-0.3px;">
+                <span style="color:#2bec6c;">Agro</span><span style="color:#CE6630;">Ezuran</span>
+            </span>
+        </div>
+        <a href="../" style="display:flex;align-items:center;gap:6px;color:#9db9a6;font-size:13px;text-decoration:none;transition:color 0.2s;"
+           onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#9db9a6'">
+            <span class="material-symbols-outlined" style="font-size:16px;">arrow_back</span> Back to Home
+        </a>
+    </div>
+
     <!-- Animated background blobs -->
     <div style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
         <!-- Large green glow top-left -->
@@ -511,10 +526,10 @@
     <!-- Left side — branding (hidden on mobile) -->
     <div class="hidden lg:flex flex-col justify-center flex-1 max-w-lg pr-16" style="animation:lp-slidein 0.6s ease both;">
         <div class="flex items-center gap-3 mb-10">
-            <div style="width:44px;height:44px;border-radius:12px;background:rgba(43,238,108,0.12);border:1.5px solid rgba(43,238,108,0.3);display:flex;align-items:center;justify-content:center;">
-                <span class="material-symbols-outlined" style="color:#2bec6c;font-size:22px;">agriculture</span>
+            <div style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                <img src="../agroezuran_icon_allmode.svg" style="width:44px;height:44px;" alt="AgroEzuran" />
             </div>
-            <span style="color:#2bec6c;font-size:18px;font-weight:800;letter-spacing:-0.3px;">AgroEzuran</span>
+            <span style="font-size:18px;font-weight:800;letter-spacing:-0.3px;"><span style="color:#2bec6c;">Agro</span><span style="color:#CE6630;">Ezuran</span></span>
         </div>
 
         <h2 style="color:#fff;font-size:clamp(2rem,4vw,3rem);font-weight:900;line-height:1.1;margin-bottom:20px;">
@@ -651,8 +666,8 @@
                     <div class="relative flex-shrink-0">
                         <!-- Glow ring behind logo -->
                         <div style="position:absolute;inset:-3px;border-radius:14px;background:linear-gradient(135deg,rgba(43,238,108,0.35),transparent 60%);z-index:0;filter:blur(2px);"></div>
-                        <div class="relative z-10 w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/25" style="box-shadow:0 0 18px rgba(43,238,108,0.18);">
-                            <span class="material-symbols-outlined text-primary text-[22px]">agriculture</span>
+                        <div class="relative z-10 w-10 h-10 rounded-xl flex items-center justify-center">
+                            <img src="../agroezuran_icon_allmode.svg" class="w-10 h-10" alt="AgroEzuran" />
                         </div>
                     </div>
                     <div class="flex flex-col">
