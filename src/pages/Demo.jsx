@@ -242,9 +242,7 @@ function PhoneTopBar({ selectedCrop, onCropChange }) {
   return (
     <div className="bg-farm-surface border-b border-farm-border px-3 py-2 flex items-center justify-between flex-shrink-0">
       <div className="flex items-center gap-1.5">
-        <div className="bg-farm-primary rounded-md p-1">
-          <Leaf className="w-3 h-3 text-farm-bg" />
-        </div>
+        <img src="/agroezuran_icon_allmode.svg" className="w-5 h-5" alt="AgroEzuran" />
         <span className="text-white text-xs font-bold">AgroEzuran</span>
       </div>
       <div className="relative">
@@ -1316,9 +1314,7 @@ function DemoHeader() {
   return (
     <header className="sticky top-0 z-50 bg-farm-bg/95 backdrop-blur border-b border-farm-border px-4 h-14 flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <div className="bg-farm-primary rounded-lg p-1.5">
-          <Leaf className="w-4 h-4 text-farm-bg" />
-        </div>
+        <img src="/agroezuran_icon_allmode.svg" className="w-7 h-7" alt="AgroEzuran" />
         <span className="text-white font-bold text-sm">AgroEzuran</span>
         <span className="hidden sm:inline px-2 py-0.5 bg-yellow-400/10 border border-yellow-400/30 text-yellow-300 text-[10px] font-bold rounded-full uppercase tracking-wide ml-1">
           Interactive Demo

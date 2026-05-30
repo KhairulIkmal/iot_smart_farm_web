@@ -290,14 +290,15 @@ function AppPreview() {
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[400px] bg-farm-primary/5 rounded-full blur-3xl" />
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center gap-0 min-h-0">
-          <div className="relative px-6 mb-10 text-center">
+        <div className="flex-1 flex flex-col items-center min-h-0">
+          <div className="relative px-6 pt-10 pb-5 text-center flex-shrink-0">
             <div className="inline-flex items-center gap-2 bg-farm-primary/10 border border-farm-primary/30 rounded-full px-4 py-1.5 text-xs text-farm-primary mb-3 font-semibold uppercase tracking-wide">
               <PiDeviceMobileBold className="w-3.5 h-3.5" /> App Preview
             </div>
             <h2 className="text-3xl sm:text-5xl font-bold text-white mb-1">See Every Screen</h2>
             <p className="text-farm-muted text-sm sm:text-base">Scroll to explore all 9 screens of the AgroEzuran mobile app</p>
           </div>
+          <div className="flex-1 w-full flex items-center min-h-0 overflow-hidden">
           <div
             ref={stripRef}
             className="relative flex items-center gap-8 px-[max(80px,calc((100vw-600px)/2))]"
@@ -308,7 +309,7 @@ function AppPreview() {
                 key={i}
                 ref={el => { cardRefs.current[i] = el }}
                 className="flex-shrink-0 group relative cursor-pointer"
-                style={{ width: 'clamp(200px, 20vw, 280px)', transformOrigin: 'center center', transition: 'transform 0.12s ease, opacity 0.12s ease', willChange: 'transform, opacity' }}
+                style={{ width: 'clamp(170px, 17vw, 240px)', transformOrigin: 'center center', transition: 'transform 0.12s ease, opacity 0.12s ease', willChange: 'transform, opacity' }}
                 onClick={() => setLightbox({ src, label: CARD_LABELS[i] ?? `Screen ${i + 1}` })}
               >
                 <div className="absolute -inset-[3px] rounded-[14px] opacity-0 group-hover:opacity-100 pointer-events-none" style={{ transition: 'opacity 0.3s ease', boxShadow: '0 0 18px 4px rgba(74,222,128,0.45), 0 0 40px 8px rgba(74,222,128,0.18)', zIndex: 0 }} />
@@ -324,6 +325,7 @@ function AppPreview() {
                 </div>
               </div>
             ))}
+          </div>
           </div>
         </div>
         <div ref={hintRef} className="absolute bottom-20 left-1/2 -translate-x-1/2 flex items-center gap-2 text-farm-muted text-xs pointer-events-none" style={{ transition: 'opacity 0.4s ease', opacity: 1 }}>
