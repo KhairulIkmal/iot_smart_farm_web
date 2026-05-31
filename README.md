@@ -109,6 +109,216 @@ Page navigation is handled by `navigateToPage(pageName)` which shows/hides the r
 
 ---
 
+## Roles & Relationship
+
+The platform operates across two apps — this **Admin Panel** (web) and the **AgroEzuran Mobile App** (Flutter). Admin is the platform operator and device seller. Farmer is the end user. Both connect through the same Firebase backend.
+
+```
+╔══════════════════════════════╗          ╔══════════════════════════════╗
+║         ADMIN                ║          ║         FARMER               ║
+║   (Web Admin Panel)          ║          ║   (AgroEzuran Mobile App)    ║
+╠══════════════════════════════╣          ╠══════════════════════════════╣
+║                              ║          ║                              ║
+║  SETUP PHASE                 ║          ║  ONBOARDING PHASE            ║
+║  ─────────────               ║          ║  ────────────────            ║
+║  · Generate AGR-XXXX-XXXX   ║─────────▶║  · Enter AGR code to claim  ║
+║    codes in batch            ║  device  ║    device                    ║
+║  · Copy firmware per device  ║  shipped ║  · Register account          ║
+║  · Flash firmware to ESP32   ║          ║  · Set farm location on map  ║
+║  · Ship physical device      ║          ║  · Grant permissions         ║
+║                              ║          ║                              ║
+╠══════════════════════════════╣          ╠══════════════════════════════╣
+║                              ║          ║                              ║
+║  MONITORING                  ║          ║  DAILY USE                   ║
+║  ──────────                  ║          ║  ─────────                   ║
+║  · View all farmers'         ║          ║  · Check live sensor tiles   ║
+║    profiles, farms, crops    ║          ║    (soil, pH, temp, humidity)║
+║  · View device status        ║◀ ─ ─ ─ ─║  · Monitor device online     ║
+║    (claimed / available /    ║  data in ║    status                    ║
+║     inactive)                ║ Firestore║  · Read weather forecast     ║
+║  · Analytics: sensor graphs  ║          ║  · Review notification inbox ║
+║    per device & time range   ║          ║                              ║
+║                              ║          ║                              ║
+╠══════════════════════════════╣          ╠══════════════════════════════╣
+║                              ║          ║                              ║
+║  NOTIFICATIONS               ║          ║  ALERTS RECEIVED             ║
+║  ─────────────               ║          ║  ───────────────             ║
+║  · Send immediate alert to   ║─────────▶║  · FCM push notification     ║
+║    all users or one farmer   ║   FCM +  ║    appears on phone          ║
+║  · Schedule future alerts    ║ Firestore║  · Notification inbox        ║
+║  · Use quick templates       ║          ║    (tabbed: All / Critical / ║
+║    (maintenance, downtime)   ║          ║     Devices / Weather / etc) ║
+║                              ║          ║  · Swipe to archive          ║
+║                              ║          ║                              ║
+╠══════════════════════════════╣          ╠══════════════════════════════╣
+║                              ║          ║                              ║
+║  SUPPORT                     ║          ║  SUPPORT                     ║
+║  ───────                     ║          ║  ───────                     ║
+║  · See all open tickets      ║          ║  · Create support ticket     ║
+║    with device + crop info   ║◀────────▶║    (device auto-attached)    ║
+║  · Reply in real-time chat   ║  live    ║  · Chat with admin in        ║
+║  · Mark resolved / reopen    ║  chat    ║    real time                 ║
+║                              ║          ║  · See resolved status       ║
+║                              ║          ║                              ║
+╠══════════════════════════════╣          ╠══════════════════════════════╣
+║                              ║          ║                              ║
+║  PLATFORM SETTINGS           ║          ║  AI & AUTOMATION             ║
+║  ─────────────────           ║          ║  ────────────────            ║
+║  · Edit global crop          ║─────────▶║  · AI Advisor reads global   ║
+║    thresholds (soil, pH,     ║  shared  ║    thresholds per crop type  ║
+║    temp, humidity min/max)   ║ Firestore║  · Apply thresholds to       ║
+║  · Deactivate defective /    ║          ║    irrigation auto-mode      ║
+║    lost devices              ║          ║  · Manual or auto pump       ║
+║  · Export database backup    ║          ║    control via RTDB command  ║
+║                              ║          ║                              ║
+╚══════════════════════════════╝          ╚══════════════════════════════╝
+```
+
+### Shared Firebase Layer
+
+```
+                        FIREBASE
+          ┌──────────────────────────────────┐
+          │                                  │
+          │  Firestore                        │
+          │  ├─ users/          ◀── admin reads, farmer writes profile  │
+          │  ├─ devices/        ◀── admin creates, farmer claims        │
+          │  ├─ crops/          ◀── farmer creates, admin reads         │
+          │  ├─ notifications/  ◀── admin writes, farmer reads          │
+          │  ├─ support_tickets/◀── farmer creates, admin replies       │
+          │  └─ crop_thresholds/◀── admin edits, AI advisor reads       │
+          │                                  │
+          │  Realtime Database                │
+          │  └─ sensors/{deviceId}/  ◀── ESP32 writes, farmer reads    │
+          │       └─ history/        ◀── ESP32 writes, admin reads      │
+          │                                  │
+          │  FCM                              │
+          │  └─ push tokens       ◀── admin triggers, farmer receives  │
+          └──────────────────────────────────┘
+```
+
+---
+
+## System Flow
+
+### Admin Operational Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ACCESS                                                              │
+│                                                                      │
+│  Visit /admin → Login (Email + Password)                             │
+│    └─ Role check: users/{uid}.role == "admin"                        │
+│         ├─ Granted → Dashboard loaded                                │
+│         └─ Denied  → "Access Denied" + signed out                   │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────────┐
+│  DEVICE LIFECYCLE                                                    │
+│                                                                      │
+│  Settings → Device Inventory                                         │
+│    ├─ Generate Codes (batch 1–50)                                    │
+│    │    └─ AGR-XXXX-XXXX codes written to Firestore devices/         │
+│    │         status: "available" · auto-named ESP32_XXX doc ID       │
+│    │                                                                 │
+│    ├─ Copy Firmware (per device)                                     │
+│    │    └─ Full ESP32 sketch copied with #define DEVICE_ID filled    │
+│    │         └─ Flash to hardware → ship to farmer                   │
+│    │                                                                 │
+│    ├─ Farmer claims device → status: "claimed"                       │
+│    │    └─ claimed_by, farmer_name, assigned_crop_id recorded        │
+│    │                                                                 │
+│    └─ Deactivate → status: "inactive"                                │
+│         └─ Blocks future claims (defective / lost / end of life)     │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────────┐
+│  USER MANAGEMENT                                                     │
+│                                                                      │
+│  Users Page                                                          │
+│    ├─ View all registered farmers (search, filter by role)           │
+│    ├─ Open farmer detail modal                                       │
+│    │    ├─ Profile tab  — name, email, UID, joined date              │
+│    │    ├─ Farm tab     — farm info, GPS location                    │
+│    │    └─ Crops tab    — crop cards with AGR code + status          │
+│    ├─ Edit user role (farmer / admin)                                │
+│    └─ Delete account                                                 │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────────┐
+│  NOTIFICATIONS                                                       │
+│                                                                      │
+│  Notifications Page                                                  │
+│    ├─ Send Now                                                       │
+│    │    ├─ Target: All Users or specific farmer                      │
+│    │    ├─ Type: Info / Warning / Alert / Success                    │
+│    │    └─ Dispatched immediately → appears in farmer's app inbox    │
+│    │                                                                 │
+│    ├─ Schedule                                                       │
+│    │    ├─ Pick date + time via Flatpickr calendar                   │
+│    │    ├─ Saved to scheduled_notifications (status: "scheduled")    │
+│    │    └─ Manual "Send Now" to dispatch when ready                  │
+│    │                                                                 │
+│    └─ Quick Templates                                                │
+│         └─ System Maintenance / System Down / System Update          │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────────┐
+│  ANALYTICS                                                           │
+│                                                                      │
+│  Analytics Page                                                      │
+│    ├─ Select device + time range (24h / 7d / 30d / Custom)          │
+│    └─ Chart.js graphs from RTDB devices/{id}/history/               │
+│         └─ Soil Moisture · Temperature · Humidity · pH · Water Level │
+└──────────────────────────────┬──────────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────────┐
+│  SUPPORT                                                             │
+│                                                                      │
+│  Support Page                                                        │
+│    ├─ View all tickets (filter by status)                            │
+│    ├─ Open ticket → real-time chat thread                            │
+│    │    └─ Device info card auto-shown (AGR code, device status)     │
+│    ├─ Reply to farmer                                                │
+│    └─ Mark resolved / reopen                                         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Admin → Farmer System Interaction
+
+```
+ADMIN PANEL                                    FARMER APP
+───────────────────────────────────────────────────────────────────
+Generate AGR-XXXX-XXXX codes
+  └─ Firestore: devices/{docId}
+       status: available
+            │
+            │  (device physically shipped to farmer)
+            │
+            ▼
+                                               Farmer enters AGR code
+                                                 └─ App claims device
+                                                      Firestore: status: claimed
+                                                      └─ RTDB listener starts
+                                                           sensors/{docId} → live data
+
+Send notification to farmer
+  └─ Firestore: notifications/{uid}/items
+                                               FCM push received
+                                                 └─ Notification inbox updated
+
+Farmer opens support ticket
+  └─ Firestore: support_tickets/{id}            
+       device + crop auto-attached             
+            │
+            ▼
+Admin sees ticket in Support page
+  └─ Reply → Firestore: messages/{msgId}
+                                               Farmer receives reply in real-time chat
+```
+
+---
+
 ## Admin Role Setup
 
 Only users with `role: "admin"` in their Firestore `users` document can access the panel. All other users are shown an "Access Denied" error and signed out.
@@ -201,4 +411,4 @@ Scheduled notifications are NOT auto-dispatched by the panel — they require a 
 
 ---
 
-*Part of the AgroEzuran IoT Smart Farm system — Built for PutraHack 2026*
+*Part of the AgroEzuran IoT Smart Farm system*
