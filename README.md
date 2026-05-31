@@ -47,6 +47,7 @@ No build step. No package manager. Drop the three files on any static host and i
 ### Users
 - Full user table with search + role badge
 - View user details modal (tabbed: Profile, Farm, Crops, Devices, Notifications)
+  - Crops tab shows AGR unique code (e.g. AGR-XXXX-XXXX) instead of internal Firestore device ID
 - Copy UID / email to clipboard
 - Edit user role
 - Delete user
@@ -240,7 +241,7 @@ The platform operates across two apps — this **Admin Panel** (web) and the **A
 │    ├─ Open farmer detail modal                                       │
 │    │    ├─ Profile tab  — name, email, UID, joined date              │
 │    │    ├─ Farm tab     — farm info, GPS location                    │
-│    │    └─ Crops tab    — crop cards with AGR code + status          │
+│    │    └─ Crops tab    — crop cards with AGR unique code + status    │
 │    ├─ Edit user role (farmer / admin)                                │
 │    └─ Delete account                                                 │
 └──────────────────────────────┬──────────────────────────────────────┘
