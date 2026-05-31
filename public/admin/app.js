@@ -1250,7 +1250,7 @@ async function viewUserDetails(userId) {
     cropsContainer.innerHTML = '<div class="text-center py-10 text-[#9db9a6]">Loading crops…</div>';
 
     db.collection('crops').where('farmer_id', '==', farmerId).get()
-        .then(snap => {
+        .then(async snap => {
             if (snap.empty) {
                 cropsContainer.innerHTML = `
                     <div class="text-center py-10">
@@ -1259,6 +1259,17 @@ async function viewUserDetails(userId) {
                     </div>`;
                 return;
             }
+
+            // Resolve device_id → unique_code
+            const deviceIds = [...new Set(snap.docs.map(d => d.data().device_id).filter(Boolean))];
+            const uniqueCodeMap = {};
+            await Promise.all(deviceIds.map(async id => {
+                try {
+                    const devDoc = await db.collection('devices').doc(id).get();
+                    uniqueCodeMap[id] = devDoc.exists ? (devDoc.data().unique_code || id) : id;
+                } catch { uniqueCodeMap[id] = id; }
+            }));
+
             const statusLabel = { active:'Active', harvested:'Harvested', inactive:'Removed' };
             const statusStyle = {
                 active:   'color:#22c55e;background:rgba(34,197,94,0.12)',
@@ -1267,12 +1278,13 @@ async function viewUserDetails(userId) {
             };
             let html = '<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">';
             snap.forEach(doc => {
-                const crop    = doc.data();
-                const st      = crop.status || 'active';
-                const label   = crop.crop_type || 'Unknown';
-                const imgUrl  = crop.image_url || '';
-                const clickFn = imgUrl ? `onclick="_openCropLightbox('${imgUrl.replace(/'/g,"\\'")}','${label.replace(/'/g,"\\'")}');event.stopPropagation()"` : '';
-                const imgTag  = imgUrl
+                const crop       = doc.data();
+                const st         = crop.status || 'active';
+                const label      = crop.crop_type || 'Unknown';
+                const imgUrl     = crop.image_url || '';
+                const deviceCode = crop.device_id ? (uniqueCodeMap[crop.device_id] || crop.device_id) : '—';
+                const clickFn    = imgUrl ? `onclick="_openCropLightbox('${imgUrl.replace(/'/g,"\\'")}','${label.replace(/'/g,"\\'")}');event.stopPropagation()"` : '';
+                const imgTag     = imgUrl
                     ? `<div class="relative overflow-hidden" style="height:112px;cursor:zoom-in" ${clickFn}>
                            <img src="${imgUrl}" alt="${label}" class="w-full h-full object-cover transition-transform duration-300 hover:scale-105">
                            <div class="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity" style="background:rgba(0,0,0,0.35)">
@@ -1288,7 +1300,7 @@ async function viewUserDetails(userId) {
                         <div class="p-3">
                             <p class="text-white font-semibold text-sm truncate">${label}</p>
                             <p class="text-[#9db9a6] text-xs truncate mt-0.5 flex items-center gap-0.5">
-                                <span class="material-symbols-outlined text-[12px]">memory</span>${crop.device_id || '—'}
+                                <span class="material-symbols-outlined text-[12px]">memory</span>${deviceCode}
                             </p>
                             <span class="inline-block mt-1.5 px-2 py-0.5 rounded-full text-xs font-medium" style="${statusStyle[st] || statusStyle.active}">${statusLabel[st] || st}</span>
                         </div>

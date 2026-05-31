@@ -63,7 +63,7 @@ import {
 } from 'react-icons/si'
 
 // ─── Config ──────────────────────────────────────────────────
-const APK_URL = 'https://drive.google.com/uc?export=download&id=1mjnvoelnVVTWk8fdPntIBN2V0wVoyXG1'
+const APK_URL = 'https://www.mediafire.com/file/mkl0o0yhmii5pq9/AgroEzuran.apk/file'
 const GITHUB_URL = 'https://github.com/Kaiszee/iot_smart_farm_app'
 
 // ─── Hook: scroll animation ───────────────────────────────────
