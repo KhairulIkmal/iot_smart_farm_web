@@ -4552,6 +4552,7 @@ struct CommandState {
 #define INTERVAL_OLED 1200
 #define INTERVAL_AUTO 1000
 #define INTERVAL_SCREEN_ROTATE 4000
+#define INTERVAL_ERROR_BUZZ 600000  // 10 minutes
 
 uint32_t lastHeartbeat = 0;
 uint32_t lastSensorPush = 0;
@@ -4560,6 +4561,7 @@ uint32_t lastSensorRead = 0;
 uint32_t lastOLED = 0;
 uint32_t lastAutoCheck = 0;
 uint32_t lastScreenRotate = 0;
+uint32_t lastErrorBuzz = 0;
 int currentScreen = 0;
 
 int mapSoilToPercent(int raw, int dry = 3300, int wet = 1200) {
@@ -4595,7 +4597,7 @@ void updateSensorHealth() {
 }
 
 void buzzerInit() { ledcSetup(BUZZER_CH, 2000, 8); ledcAttachPin(PIN_BUZZER, BUZZER_CH); ledcWrite(BUZZER_CH, 0); }
-void buzzSensorError() { for (int i=0;i<3;i++){ledcWriteTone(BUZZER_CH,800);delay(100);ledcWrite(BUZZER_CH,0);delay(80);} }
+void buzzSensorError() { ledcWriteTone(BUZZER_CH,800);delay(200);ledcWrite(BUZZER_CH,0); }
 void buzzConnectFail() { ledcWriteTone(BUZZER_CH,800);delay(300);ledcWrite(BUZZER_CH,0);delay(80);ledcWriteTone(BUZZER_CH,400);delay(500);ledcWrite(BUZZER_CH,0); }
 void buzzSuccess() { ledcWriteTone(BUZZER_CH,523);delay(150);ledcWrite(BUZZER_CH,0);delay(50);ledcWriteTone(BUZZER_CH,659);delay(150);ledcWrite(BUZZER_CH,0);delay(50);ledcWriteTone(BUZZER_CH,784);delay(300);ledcWrite(BUZZER_CH,0); }
 void buzzPumpOn() { ledcWriteTone(BUZZER_CH,400);delay(80);ledcWrite(BUZZER_CH,0);delay(30);ledcWriteTone(BUZZER_CH,800);delay(120);ledcWrite(BUZZER_CH,0); }
@@ -4724,7 +4726,7 @@ void loop() {
     S.waterLevelRaw=analogRead(PIN_WATER_LEVEL_ADC);
     S.tankPct=(S.waterLevelRaw<50||S.waterLevelRaw>4000)?-1:readWaterLevelPercent(S.waterLevelRaw);
     updateSensorHealth();
-    if (hasAnyError()) buzzSensorError();
+    if (hasAnyError() && (now - lastErrorBuzz >= INTERVAL_ERROR_BUZZ)) { lastErrorBuzz = now; buzzSensorError(); }
   }
   if (now-lastSensorPush>=INTERVAL_SENSORS)    { lastSensorPush=now; pushSensorData(); pushSensorHealth(); }
   if (now-lastAutoCheck>=INTERVAL_AUTO)        { lastAutoCheck=now; executeCommands(); }
