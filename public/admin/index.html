@@ -1564,9 +1564,21 @@
                     </div>
                     <div class="p-5 space-y-4">
                         <div id="generated-code-display" class="hidden bg-[#111813] border border-primary/40 rounded-xl p-5 text-center">
-                            <p class="text-[#9db9a6] text-sm mb-2">New Device Code</p>
-                            <p id="generated-code-value" class="text-primary text-3xl font-mono font-bold tracking-widest"></p>
-                            <p class="text-[#9db9a6] text-xs mt-3">Save this code — it will be given to the farmer when they purchase the device.</p>
+                            <!-- Single code view -->
+                            <div id="single-code-view">
+                                <p class="text-[#9db9a6] text-sm mb-1">New Device Code</p>
+                                <p id="generated-code-value" class="text-primary text-2xl font-mono font-bold tracking-widest mb-3"></p>
+                                <div id="qr-code-canvas" class="flex justify-center mb-3"></div>
+                                <button onclick="downloadGeneratedQr()" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg border border-primary/30 hover:bg-primary/20 transition-colors text-xs font-semibold">
+                                    <span class="material-symbols-outlined text-[14px]">download</span> Download QR
+                                </button>
+                            </div>
+                            <!-- Multi code view -->
+                            <div id="multi-code-view" class="hidden">
+                                <p id="generated-code-value-multi" class="text-primary font-bold mb-3"></p>
+                                <div id="qr-codes-grid" class="grid grid-cols-2 gap-3 max-h-64 overflow-y-auto pr-1"></div>
+                            </div>
+                            <p class="text-[#9db9a6] text-xs mt-3">Save these codes — give them to farmers when they purchase the device.</p>
                         </div>
                         <div>
                             <label class="block text-[#9db9a6] text-sm mb-1">Quantity</label>
@@ -1978,6 +1990,9 @@
 
 <!-- Flatpickr calendar picker -->
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<!-- QR Code generator -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 <!-- Chart.js for Analytics -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

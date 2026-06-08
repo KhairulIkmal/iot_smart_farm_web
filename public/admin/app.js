@@ -4297,6 +4297,10 @@ function renderDevices() {
             <td class="p-4 text-[#9db9a6] text-sm">${claimedDate}</td>
             <td class="p-4">${notes}</td>
             <td class="p-4 text-right flex items-center justify-end gap-2">
+                <button onclick="showDeviceQrModal('${dev.unique_code || dev.id}')"
+                    class="px-3 py-1.5 text-xs rounded-lg border border-primary/30 text-primary hover:bg-primary/10 transition-colors flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[13px]">qr_code</span> QR
+                </button>
                 <button onclick="copyFirmwareCode('${dev.id}')"
                     class="px-3 py-1.5 text-xs rounded-lg border border-primary/30 text-primary hover:bg-primary/10 transition-colors flex items-center gap-1">
                     <span class="material-symbols-outlined text-[13px]">code</span> Firmware
@@ -4337,7 +4341,38 @@ async function handleGenerateCodes() {
         await batch.commit();
 
         document.getElementById('generated-code-display').classList.remove('hidden');
-        document.getElementById('generated-code-value').textContent = codes.length === 1 ? codes[0] : `${codes.length} codes generated`;
+
+        if (codes.length === 1) {
+            document.getElementById('single-code-view').classList.remove('hidden');
+            document.getElementById('multi-code-view').classList.add('hidden');
+            document.getElementById('generated-code-value').textContent = codes[0];
+            const qrCanvas = document.getElementById('qr-code-canvas');
+            qrCanvas.innerHTML = '';
+            new QRCode(qrCanvas, { text: codes[0], width: 150, height: 150, colorDark: '#2bee6c', colorLight: '#111813' });
+        } else {
+            document.getElementById('single-code-view').classList.add('hidden');
+            document.getElementById('multi-code-view').classList.remove('hidden');
+            document.getElementById('generated-code-value-multi').textContent = `${codes.length} codes generated`;
+            const grid = document.getElementById('qr-codes-grid');
+            grid.innerHTML = '';
+            codes.forEach(code => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'flex flex-col items-center gap-1.5 p-2 bg-[#0a1209] rounded-lg border border-[#28392e]';
+                const qrDiv = document.createElement('div');
+                wrapper.appendChild(qrDiv);
+                const label = document.createElement('p');
+                label.className = 'font-mono text-primary text-[10px] font-bold tracking-wider';
+                label.textContent = code;
+                wrapper.appendChild(label);
+                const dlBtn = document.createElement('button');
+                dlBtn.className = 'inline-flex items-center gap-0.5 text-[10px] px-2 py-0.5 bg-primary/10 text-primary rounded border border-primary/30 hover:bg-primary/20 transition-colors';
+                dlBtn.innerHTML = '<span class="material-symbols-outlined text-[11px]">download</span> DL';
+                dlBtn.onclick = () => _downloadQrFromDiv(qrDiv, code);
+                wrapper.appendChild(dlBtn);
+                grid.appendChild(wrapper);
+                new QRCode(qrDiv, { text: code, width: 100, height: 100, colorDark: '#2bee6c', colorLight: '#111813' });
+            });
+        }
         btn.textContent = 'Generate More';
     } catch (err) {
         console.error('Generate error:', err);
@@ -4351,6 +4386,66 @@ function generateUniqueDeviceCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const part = (n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     return `AGR-${part(4)}-${part(4)}`;
+}
+
+function downloadGeneratedQr() {
+    const canvas = document.getElementById('qr-code-canvas').querySelector('canvas');
+    const code = document.getElementById('generated-code-value').textContent;
+    if (!canvas || !code) return;
+    const link = document.createElement('a');
+    link.download = `${code}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+function _downloadQrFromDiv(qrDiv, code) {
+    const canvas = qrDiv.querySelector('canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `${code}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+function showDeviceQrModal(code) {
+    let modal = document.getElementById('device-qr-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'device-qr-modal';
+        modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-[#1c271f] rounded-xl border border-[#28392e] shadow-xl p-6 m-4 text-center" style="min-width:260px">
+                <p class="text-white font-bold text-base mb-1">Device QR Code</p>
+                <p id="device-qr-code-label" class="font-mono text-primary text-sm mb-4 tracking-widest"></p>
+                <div id="device-qr-canvas" class="flex justify-center mb-4"></div>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="downloadDeviceQr()" class="flex items-center gap-1.5 px-4 py-2 bg-primary text-[#111813] rounded-lg text-sm font-bold hover:bg-[#5fa671] transition-colors">
+                        <span class="material-symbols-outlined text-[16px]">download</span> Download
+                    </button>
+                    <button onclick="document.getElementById('device-qr-modal').classList.add('hidden')" class="px-4 py-2 bg-[#28392e] text-[#9db9a6] rounded-lg text-sm hover:text-white transition-colors">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+    }
+    modal.classList.remove('hidden');
+    document.getElementById('device-qr-code-label').textContent = code;
+    const canvas = document.getElementById('device-qr-canvas');
+    canvas.innerHTML = '';
+    new QRCode(canvas, { text: code, width: 180, height: 180, colorDark: '#2bee6c', colorLight: '#111813' });
+}
+
+function downloadDeviceQr() {
+    const canvas = document.getElementById('device-qr-canvas').querySelector('canvas');
+    const code = document.getElementById('device-qr-code-label').textContent;
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `${code}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
 }
 
 function copyFirmwareCode(deviceId) {
